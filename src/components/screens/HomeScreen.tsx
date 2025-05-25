@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import ContentCard from '../ContentCard';
 import CategoryFilter from '../CategoryFilter';
@@ -17,7 +16,7 @@ const HomeScreen = () => {
       categoryLabel: 'Fitness',
       tags: ['habits', 'productivity', 'wellness'],
       dateAdded: '2025-01-20',
-      priority: 'medium',
+      priority: 'medium' as const,
       hasNotes: true,
       hasChecklist: false,
       reminderSet: true
@@ -31,7 +30,7 @@ const HomeScreen = () => {
       categoryLabel: 'Finance',
       tags: ['business', 'money', 'entrepreneurship'],
       dateAdded: '2025-01-19',
-      priority: 'high',
+      priority: 'high' as const,
       hasNotes: false,
       hasChecklist: true,
       reminderSet: false
@@ -45,7 +44,7 @@ const HomeScreen = () => {
       categoryLabel: 'Knowledge',
       tags: ['psychology', 'habits', 'self-improvement'],
       dateAdded: '2025-01-18',
-      priority: 'low',
+      priority: 'low' as const,
       hasNotes: true,
       hasChecklist: true,
       reminderSet: true
