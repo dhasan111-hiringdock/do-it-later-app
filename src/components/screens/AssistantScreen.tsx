@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { Sparkles, Send, Zap, FileText, Calendar, CheckSquare } from 'lucide-react';
 import AISearchBar from '../AISearchBar';
 
 const AssistantScreen = () => {
@@ -64,21 +65,54 @@ const AssistantScreen = () => {
     }, 2000);
   };
 
+  const quickActions = [
+    { icon: FileText, label: 'Create Plan', color: 'bg-dolater-mint' },
+    { icon: CheckSquare, label: 'Build Habits', color: 'bg-dolater-yellow' },
+    { icon: Calendar, label: 'Schedule', color: 'bg-purple-500' },
+    { icon: Zap, label: 'Quick Action', color: 'bg-orange-500' }
+  ];
+
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)]">
+    <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
-      <div className="text-center py-4 border-b border-gray-200 bg-white">
-        <h1 className="text-xl font-bold text-dolater-text-primary">AI Assistant</h1>
-        <p className="text-xs text-dolater-text-secondary">Your personal productivity coach</p>
+      <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-r from-dolater-mint to-dolater-mint-dark rounded-full flex items-center justify-center">
+            <Sparkles size={20} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-dolater-text-primary">AI Assistant</h1>
+            <p className="text-xs text-dolater-text-secondary">Your personal productivity coach</p>
+          </div>
+        </div>
       </div>
 
       {/* AI Search Bar */}
-      <div className="p-4 border-b border-gray-200 bg-white">
+      <div className="bg-white border-b border-gray-200 p-4">
         <AISearchBar 
           onAISearch={handleAISearch}
           isLoading={isAILoading}
           isPro={false}
         />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white border-b border-gray-200 p-4">
+        <div className="text-xs font-medium text-dolater-text-secondary mb-3">Quick Actions</div>
+        <div className="grid grid-cols-4 gap-2">
+          {quickActions.map((action, index) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={index}
+                className={`${action.color} text-white p-3 rounded-lg flex flex-col items-center space-y-1 hover:opacity-90 transition-opacity`}
+              >
+                <Icon size={16} />
+                <span className="text-xs font-medium">{action.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Messages */}
@@ -89,10 +123,10 @@ const AssistantScreen = () => {
             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] p-3 rounded-lg ${
+              className={`max-w-[85%] p-3 rounded-lg ${
                 message.type === 'user'
-                  ? 'bg-dolater-mint text-white'
-                  : 'bg-white card-shadow text-dolater-text-primary'
+                  ? 'bg-dolater-mint text-white rounded-br-sm'
+                  : 'bg-white card-shadow text-dolater-text-primary rounded-bl-sm'
               }`}
             >
               <p className="text-sm whitespace-pre-line">{message.content}</p>
@@ -109,7 +143,7 @@ const AssistantScreen = () => {
         ))}
         {isAILoading && (
           <div className="flex justify-start">
-            <div className="bg-white card-shadow text-dolater-text-primary max-w-[80%] p-3 rounded-lg">
+            <div className="bg-white card-shadow text-dolater-text-primary max-w-[85%] p-3 rounded-lg rounded-bl-sm">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <div className="w-2 h-2 bg-dolater-mint rounded-full animate-pulse"></div>
@@ -123,19 +157,9 @@ const AssistantScreen = () => {
         )}
       </div>
 
-      {/* Quick Actions */}
-      <div className="p-4 border-t border-gray-200 bg-white">
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <button className="bg-dolater-mint-light text-dolater-mint p-2 rounded-lg text-xs font-medium">
-            Create Plan
-          </button>
-          <button className="bg-dolater-yellow text-dolater-text-primary p-2 rounded-lg text-xs font-medium">
-            Set Habits
-          </button>
-        </div>
-
-        {/* Input */}
-        <div className="flex space-x-2">
+      {/* Input Area */}
+      <div className="bg-white border-t border-gray-200 p-4">
+        <div className="flex space-x-3">
           <input
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
@@ -146,21 +170,21 @@ const AssistantScreen = () => {
           <button
             onClick={handleSendMessage}
             disabled={!inputMessage.trim()}
-            className="bg-dolater-mint text-white px-4 py-3 rounded-lg disabled:opacity-50"
+            className="bg-dolater-mint text-white p-3 rounded-lg disabled:opacity-50 hover:bg-dolater-mint-dark transition-colors"
           >
-            Send
+            <Send size={16} />
           </button>
         </div>
       </div>
 
       {/* Pro Upgrade Banner */}
-      <div className="bg-gradient-to-r from-dolater-yellow to-yellow-400 p-4 text-dolater-text-primary">
+      <div className="bg-gradient-to-r from-dolater-yellow to-yellow-400 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-sm">Unlock Full AI Assistant</h3>
-            <p className="text-xs opacity-90">Get unlimited plans, habits & coaching</p>
+            <h3 className="font-semibold text-sm text-dolater-text-primary">Unlock Full AI Assistant</h3>
+            <p className="text-xs text-dolater-text-primary opacity-80">Get unlimited plans, habits & coaching</p>
           </div>
-          <button className="bg-white text-dolater-mint px-3 py-2 rounded-lg text-xs font-medium">
+          <button className="bg-white text-dolater-mint px-4 py-2 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
             Upgrade Pro
           </button>
         </div>

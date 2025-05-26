@@ -51,18 +51,18 @@ const AISearchBar = ({ onAISearch, isLoading = false, isPro = false }: AISearchB
           <button
             type="submit"
             disabled={!query.trim() || !isPro || isLoading}
-            className="absolute bottom-2 right-2 p-2 bg-dolater-mint text-white rounded-lg disabled:opacity-50"
+            className="absolute bottom-2 right-2 p-2 bg-dolater-mint text-white rounded-lg disabled:opacity-50 hover:bg-dolater-mint-dark transition-colors"
           >
             <Send size={16} />
           </button>
         </div>
 
         {!isPro && (
-          <div className="bg-dolater-mint-light p-3 rounded-lg">
+          <div className="bg-dolater-mint-light border border-dolater-mint/20 p-3 rounded-lg">
             <p className="text-sm text-dolater-mint mb-2">
-              Unlock AI-powered content organization with DoLater Pro
+              🚀 Unlock AI-powered content organization with DoLater Pro
             </p>
-            <button className="bg-dolater-mint text-white px-4 py-2 rounded-lg text-sm font-medium">
+            <button className="bg-dolater-mint text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-dolater-mint-dark transition-colors">
               Upgrade to Pro
             </button>
           </div>
@@ -76,7 +76,7 @@ const AISearchBar = ({ onAISearch, isLoading = false, isPro = false }: AISearchB
             <button
               key={index}
               onClick={() => setQuery(suggestion)}
-              className="w-full text-left p-2 text-sm text-dolater-text-secondary bg-dolater-gray rounded hover:bg-gray-200"
+              className="w-full text-left p-2 text-sm text-dolater-text-secondary bg-dolater-gray rounded hover:bg-gray-200 transition-colors"
             >
               "{suggestion}"
             </button>

@@ -30,19 +30,20 @@ const SearchResults = ({ results, searchQuery, highlightMatches, totalCount }: S
     <div className="space-y-4">
       <div className="text-sm text-dolater-text-secondary">
         Found {results.length} result{results.length !== 1 ? 's' : ''} for "{searchQuery}"
+        {totalCount > results.length && ` (of ${totalCount} total items)`}
       </div>
       
-      {results.map((item) => (
-        <div key={item.id}>
-          <ContentCard 
-            content={{
-              ...item,
-              title: highlightMatches(item.title),
-              summary: highlightMatches(item.summary)
-            }} 
-          />
-        </div>
-      ))}
+      <div className="grid gap-4">
+        {results.map((item) => (
+          <div key={item.id} className="relative">
+            <ContentCard 
+              content={item}
+            />
+            {/* Search match indicator */}
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-dolater-yellow rounded-full border-2 border-white"></div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

@@ -11,7 +11,7 @@ const HomeScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Enhanced mock data with new fields
+  // Enhanced mock data with images and platform info
   const mockContent = [
     {
       id: '1',
@@ -66,6 +66,42 @@ const HomeScreen = () => {
       actionType: 'learn',
       userNotes: 'Great insights on behavior change',
       transcript: 'Psychology research on habit formation and behavior change'
+    },
+    {
+      id: '4',
+      title: 'Minimalist Home Workout - No Equipment Needed',
+      summary: 'Complete 30-minute workout routine you can do anywhere with zero equipment.',
+      url: 'https://example.com/home-workout',
+      category: 'fitness',
+      categoryLabel: 'Fitness',
+      tags: ['workout', 'fitness', 'home', 'minimalist'],
+      dateAdded: '2025-01-17',
+      priority: 'high' as const,
+      hasNotes: false,
+      hasChecklist: true,
+      reminderSet: true,
+      platform: 'instagram',
+      actionType: 'do',
+      userNotes: '',
+      transcript: 'Bodyweight exercises for strength and cardio'
+    },
+    {
+      id: '5',
+      title: 'Investment Strategies for Beginners',
+      summary: 'Learn the fundamentals of investing and build long-term wealth with simple strategies.',
+      url: 'https://example.com/investment-basics',
+      category: 'finance',
+      categoryLabel: 'Finance',
+      tags: ['investing', 'money', 'wealth', 'beginner'],
+      dateAdded: '2025-01-16',
+      priority: 'medium' as const,
+      hasNotes: true,
+      hasChecklist: false,
+      reminderSet: false,
+      platform: 'youtube',
+      actionType: 'learn',
+      userNotes: 'Start with index funds',
+      transcript: 'Index funds, ETFs, and diversification strategies'
     }
   ];
 
@@ -154,7 +190,7 @@ const HomeScreen = () => {
           totalCount={mockContent.length}
         />
       ) : (
-        <div className="space-y-4">
+        <div className="grid gap-4">
           {filteredContent.length > 0 ? (
             filteredContent.map((item) => (
               <ContentCard key={item.id} content={item} />
@@ -176,7 +212,7 @@ const HomeScreen = () => {
           <p className="text-sm opacity-90 mb-3">
             You have {mockContent.filter(item => item.reminderSet).length} items with reminders set.
           </p>
-          <button className="bg-white text-dolater-mint px-4 py-2 rounded-lg text-sm font-medium">
+          <button className="bg-white text-dolater-mint px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
             Review Now
           </button>
         </div>
