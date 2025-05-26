@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import SplashScreen from "./components/SplashScreen";
 import WelcomeScreen from "./components/WelcomeScreen";
 import AuthScreen from "./components/AuthScreen";
@@ -16,9 +17,9 @@ const queryClient = new QueryClient();
 
 type AppState = 'splash' | 'welcome' | 'login' | 'signup' | 'connect' | 'app';
 
-const App = () => {
+const AppContent = () => {
   const [appState, setAppState] = useState<AppState>('splash');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, loading } = useAuth();
 
   const handleSplashComplete = () => {
     setAppState('welcome');
@@ -32,10 +33,8 @@ const App = () => {
     setAppState('login');
   };
 
-  const handleAuth = (email: string, password: string) => {
-    console.log('Auth:', email, password);
-    setIsAuthenticated(true);
-    setAppState('connect');
+  const handleAuth = () => {
+    setAppState('app');
   };
 
   const handleBackToWelcome = () => {
@@ -53,6 +52,16 @@ const App = () => {
   const handleConnectSkip = () => {
     setAppState('app');
   };
+
+  // Show loading while auth is initializing
+  if (loading) {
+    return <SplashScreen onComplete={() => {}} />;
+  }
+
+  // If user is authenticated, go directly to app
+  if (user && appState !== 'app') {
+    setAppState('app');
+  }
 
   const renderCurrentScreen = () => {
     switch (appState) {
@@ -95,16 +104,24 @@ const App = () => {
   };
 
   return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={renderCurrentScreen()} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
+const App = () => {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={renderCurrentScreen()} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
+        <AuthProvider>
+          <Toaster />
+          <Sonner />
+          <AppContent />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

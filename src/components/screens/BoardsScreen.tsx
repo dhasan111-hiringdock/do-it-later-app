@@ -1,12 +1,22 @@
 
+import { useBoards } from '../../hooks/useBoards';
+import { useContentItems } from '../../hooks/useContentItems';
+
 const BoardsScreen = () => {
-  const boards = [
-    { id: '1', name: 'Fitness & Health', count: 8, color: 'bg-category-fitness' },
-    { id: '2', name: 'Financial Growth', count: 5, color: 'bg-category-finance' },
-    { id: '3', name: 'Learning & Knowledge', count: 12, color: 'bg-category-knowledge' },
-    { id: '4', name: 'Personal Development', count: 3, color: 'bg-category-personal' },
-    { id: '5', name: 'Work & Career', count: 7, color: 'bg-category-work' },
-  ];
+  const { boards, loading: boardsLoading } = useBoards();
+  const { contentItems } = useContentItems();
+
+  if (boardsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-8 h-8 border-2 border-dolater-mint border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const totalItems = contentItems.length;
+  const totalBoards = boards.length;
+  const itemsWithReminders = contentItems.filter(item => item.reminderSet).length;
 
   return (
     <div className="space-y-6">
@@ -23,15 +33,15 @@ const BoardsScreen = () => {
         <h3 className="font-medium text-dolater-text-primary mb-3">Overview</h3>
         <div className="grid grid-cols-3 gap-4">
           <div className="text-center">
-            <div className="text-2xl font-bold text-dolater-mint">35</div>
+            <div className="text-2xl font-bold text-dolater-mint">{totalItems}</div>
             <div className="text-xs text-dolater-text-secondary">Total Items</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-dolater-yellow">5</div>
+            <div className="text-2xl font-bold text-dolater-yellow">{totalBoards}</div>
             <div className="text-xs text-dolater-text-secondary">Active Boards</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-category-urgent">8</div>
+            <div className="text-2xl font-bold text-category-urgent">{itemsWithReminders}</div>
             <div className="text-xs text-dolater-text-secondary">With Reminders</div>
           </div>
         </div>
@@ -39,29 +49,37 @@ const BoardsScreen = () => {
 
       {/* Boards Grid */}
       <div className="space-y-3">
-        {boards.map((board) => (
-          <div key={board.id} className="bg-white rounded-lg p-4 card-shadow">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className={`w-4 h-4 ${board.color} rounded`}></div>
-                <div>
-                  <h3 className="font-medium text-dolater-text-primary">{board.name}</h3>
-                  <p className="text-xs text-dolater-text-secondary">{board.count} items</p>
+        {boards.length > 0 ? (
+          boards.map((board) => (
+            <div key={board.id} className="bg-white rounded-lg p-4 card-shadow">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-4 h-4 ${board.color} rounded`}></div>
+                  <div>
+                    <h3 className="font-medium text-dolater-text-primary">{board.name}</h3>
+                    <p className="text-xs text-dolater-text-secondary">{board.count} items</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="bg-dolater-gray text-dolater-text-secondary px-2 py-1 rounded text-xs">
+                    {board.count}
+                  </span>
+                  <button className="text-dolater-mint hover:text-dolater-mint-dark">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="bg-dolater-gray text-dolater-text-secondary px-2 py-1 rounded text-xs">
-                  {board.count}
-                </span>
-                <button className="text-dolater-mint hover:text-dolater-mint-dark">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-12">
+            <div className="text-dolater-text-secondary text-sm">
+              No boards created yet. Create your first board!
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Add New Board */}

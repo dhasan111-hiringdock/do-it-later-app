@@ -6,104 +6,14 @@ import SearchBar from '../SearchBar';
 import SearchFilters from '../SearchFilters';
 import SearchResults from '../SearchResults';
 import { useSearch } from '../../hooks/useSearch';
+import { useContentItems } from '../../hooks/useContentItems';
+import { useAuth } from '../../hooks/useAuth';
 
 const HomeScreen = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
-
-  // Enhanced mock data with images and platform info
-  const mockContent = [
-    {
-      id: '1',
-      title: '10 Morning Habits That Will Transform Your Life',
-      summary: 'Discover science-backed morning routines that successful people use to start their day with purpose and energy.',
-      url: 'https://example.com/morning-habits',
-      category: 'fitness',
-      categoryLabel: 'Fitness',
-      tags: ['habits', 'productivity', 'wellness'],
-      dateAdded: '2025-01-20',
-      priority: 'medium' as const,
-      hasNotes: true,
-      hasChecklist: false,
-      reminderSet: true,
-      platform: 'instagram',
-      actionType: 'do',
-      userNotes: 'Want to try the 5am wake up routine',
-      transcript: 'Morning routines for success and productivity'
-    },
-    {
-      id: '2',
-      title: 'How to Build a $10k/Month Side Business',
-      summary: 'Step-by-step guide to creating a profitable online business while working full-time.',
-      url: 'https://example.com/side-business',
-      category: 'finance',
-      categoryLabel: 'Finance',
-      tags: ['business', 'money', 'entrepreneurship'],
-      dateAdded: '2025-01-19',
-      priority: 'high' as const,
-      hasNotes: false,
-      hasChecklist: true,
-      reminderSet: false,
-      platform: 'youtube',
-      actionType: 'learn',
-      userNotes: '',
-      transcript: 'Side business ideas and strategies for extra income'
-    },
-    {
-      id: '3',
-      title: 'The Psychology of Habit Formation',
-      summary: 'Understanding the science behind how habits are formed and how to make positive changes stick.',
-      url: 'https://example.com/habit-psychology',
-      category: 'knowledge',
-      categoryLabel: 'Knowledge',
-      tags: ['psychology', 'habits', 'self-improvement'],
-      dateAdded: '2025-01-18',
-      priority: 'low' as const,
-      hasNotes: true,
-      hasChecklist: true,
-      reminderSet: true,
-      platform: 'reddit',
-      actionType: 'learn',
-      userNotes: 'Great insights on behavior change',
-      transcript: 'Psychology research on habit formation and behavior change'
-    },
-    {
-      id: '4',
-      title: 'Minimalist Home Workout - No Equipment Needed',
-      summary: 'Complete 30-minute workout routine you can do anywhere with zero equipment.',
-      url: 'https://example.com/home-workout',
-      category: 'fitness',
-      categoryLabel: 'Fitness',
-      tags: ['workout', 'fitness', 'home', 'minimalist'],
-      dateAdded: '2025-01-17',
-      priority: 'high' as const,
-      hasNotes: false,
-      hasChecklist: true,
-      reminderSet: true,
-      platform: 'instagram',
-      actionType: 'do',
-      userNotes: '',
-      transcript: 'Bodyweight exercises for strength and cardio'
-    },
-    {
-      id: '5',
-      title: 'Investment Strategies for Beginners',
-      summary: 'Learn the fundamentals of investing and build long-term wealth with simple strategies.',
-      url: 'https://example.com/investment-basics',
-      category: 'finance',
-      categoryLabel: 'Finance',
-      tags: ['investing', 'money', 'wealth', 'beginner'],
-      dateAdded: '2025-01-16',
-      priority: 'medium' as const,
-      hasNotes: true,
-      hasChecklist: false,
-      reminderSet: false,
-      platform: 'youtube',
-      actionType: 'learn',
-      userNotes: 'Start with index funds',
-      transcript: 'Index funds, ETFs, and diversification strategies'
-    }
-  ];
+  const { user } = useAuth();
+  const { contentItems, loading } = useContentItems();
 
   const {
     searchQuery,
@@ -114,13 +24,13 @@ const HomeScreen = () => {
     recentSearches,
     addRecentSearch,
     highlightMatches
-  } = useSearch(mockContent);
+  } = useSearch(contentItems);
 
   const filteredContent = searchQuery 
     ? searchResults 
     : selectedCategory === 'all' 
-      ? mockContent 
-      : mockContent.filter(item => item.category === selectedCategory);
+      ? contentItems 
+      : contentItems.filter(item => item.category === selectedCategory);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -132,6 +42,14 @@ const HomeScreen = () => {
   const handleRecentSearchClick = (search: string) => {
     setSearchQuery(search);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-8 h-8 border-2 border-dolater-mint border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -150,16 +68,20 @@ const HomeScreen = () => {
         {/* Stats */}
         <div className="flex space-x-4 mb-4">
           <div className="bg-white rounded-lg p-3 flex-1 card-shadow">
-            <div className="text-lg font-bold text-dolater-text-primary">{mockContent.length}</div>
+            <div className="text-lg font-bold text-dolater-text-primary">{contentItems.length}</div>
             <div className="text-xs text-dolater-text-secondary">Saved Items</div>
           </div>
           <div className="bg-white rounded-lg p-3 flex-1 card-shadow">
-            <div className="text-lg font-bold text-dolater-text-primary">3</div>
+            <div className="text-lg font-bold text-dolater-text-primary">
+              {new Set(contentItems.map(item => item.category)).size}
+            </div>
             <div className="text-xs text-dolater-text-secondary">Categories</div>
           </div>
           <div className="bg-white rounded-lg p-3 flex-1 card-shadow">
-            <div className="text-lg font-bold text-dolater-yellow">12</div>
-            <div className="text-xs text-dolater-text-secondary">Left This Month</div>
+            <div className="text-lg font-bold text-dolater-yellow">
+              {contentItems.filter(item => item.reminderSet).length}
+            </div>
+            <div className="text-xs text-dolater-text-secondary">With Reminders</div>
           </div>
         </div>
 
@@ -187,7 +109,7 @@ const HomeScreen = () => {
           results={filteredContent}
           searchQuery={searchQuery}
           highlightMatches={highlightMatches}
-          totalCount={mockContent.length}
+          totalCount={contentItems.length}
         />
       ) : (
         <div className="grid gap-4">
@@ -198,19 +120,22 @@ const HomeScreen = () => {
           ) : (
             <div className="text-center py-12">
               <div className="text-dolater-text-secondary text-sm">
-                No content in this category yet.
+                {contentItems.length === 0 
+                  ? "No content saved yet. Start by adding some content!"
+                  : "No content in this category yet."
+                }
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Quick Actions - only show when not searching */}
-      {!searchQuery && (
+      {/* Quick Actions - only show when not searching and has content */}
+      {!searchQuery && contentItems.length > 0 && (
         <div className="bg-gradient-to-r from-dolater-mint to-dolater-mint-dark rounded-lg p-4 text-white">
           <h3 className="font-semibold mb-2">Ready to take action?</h3>
           <p className="text-sm opacity-90 mb-3">
-            You have {mockContent.filter(item => item.reminderSet).length} items with reminders set.
+            You have {contentItems.filter(item => item.reminderSet).length} items with reminders set.
           </p>
           <button className="bg-white text-dolater-mint px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
             Review Now

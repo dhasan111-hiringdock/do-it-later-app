@@ -1,24 +1,84 @@
 
 import { useState } from 'react';
 import { Bell } from 'lucide-react';
+import { useContentItems } from '../../hooks/useContentItems';
+import { useToast } from '../../hooks/use-toast';
 
 const AddScreen = () => {
   const [url, setUrl] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const { addContentItem, contentItems } = useContentItems();
+  const { toast } = useToast();
+
+  const extractInfoFromUrl = (url: string) => {
+    // Simple URL processing - in a real app this would be more sophisticated
+    let platform = 'website';
+    let category = 'knowledge';
+    
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      platform = 'youtube';
+      category = 'knowledge';
+    } else if (url.includes('instagram.com')) {
+      platform = 'instagram';
+      category = 'fitness';
+    } else if (url.includes('reddit.com')) {
+      platform = 'reddit';
+      category = 'knowledge';
+    } else if (url.includes('medium.com') || url.includes('blog')) {
+      platform = 'blog';
+      category = 'knowledge';
+    }
+
+    // Generate a simple title based on URL
+    const title = url.split('/').pop()?.replace(/-/g, ' ').replace(/\?.*$/, '') || 'Saved Content';
+    
+    return {
+      title: title.charAt(0).toUpperCase() + title.slice(1),
+      summary: `Content saved from ${platform}`,
+      platform,
+      category,
+      tags: [platform],
+      priority: 'medium' as const,
+      hasNotes: false,
+      hasChecklist: false,
+      reminderSet: false,
+      actionType: 'learn',
+      userNotes: '',
+      transcript: '',
+    };
+  };
 
   const handleAddContent = async () => {
     if (!url.trim()) return;
     
     setIsProcessing(true);
     
-    // Simulate AI processing
-    setTimeout(() => {
-      setIsProcessing(false);
+    try {
+      const contentInfo = extractInfoFromUrl(url.trim());
+      
+      await addContentItem({
+        ...contentInfo,
+        url: url.trim(),
+        categoryLabel: contentInfo.category.charAt(0).toUpperCase() + contentInfo.category.slice(1),
+      });
+      
       setUrl('');
-      // Here you would typically save the content and show success
-      alert('Content saved successfully! 🎉');
-    }, 2000);
+      toast({
+        title: "Success!",
+        description: "Content saved successfully! 🎉",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save content. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
+
+  const recentSaves = contentItems.slice(0, 3);
 
   return (
     <div className="space-y-6">
@@ -56,7 +116,7 @@ const AddScreen = () => {
             {isProcessing ? (
               <div className="flex items-center justify-center space-x-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                <span>AI Processing...</span>
+                <span>Processing...</span>
               </div>
             ) : (
               'Save Content'
@@ -92,12 +152,18 @@ const AddScreen = () => {
       <div className="bg-white rounded-lg p-4 card-shadow">
         <h3 className="font-medium text-dolater-text-primary mb-3">Recent Saves</h3>
         <div className="space-y-3">
-          {['Fitness routine video', 'Investment article', 'Recipe for healthy meals'].map((item, index) => (
-            <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-              <span className="text-sm text-dolater-text-secondary">{item}</span>
-              <span className="text-xs text-dolater-mint">Saved</span>
+          {recentSaves.length > 0 ? (
+            recentSaves.map((item, index) => (
+              <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <span className="text-sm text-dolater-text-secondary truncate">{item.title}</span>
+                <span className="text-xs text-dolater-mint">Saved</span>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-4 text-sm text-dolater-text-secondary">
+              No content saved yet
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -106,7 +172,7 @@ const AddScreen = () => {
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-semibold">Free Plan</h3>
-            <p className="text-sm opacity-90">12 saves left this month</p>
+            <p className="text-sm opacity-90">{Math.max(0, 20 - contentItems.length)} saves left this month</p>
           </div>
           <button className="bg-white text-dolater-mint px-4 py-2 rounded-lg text-sm font-medium">
             Upgrade

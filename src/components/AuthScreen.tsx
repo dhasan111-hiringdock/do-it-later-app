@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthScreenProps {
   isLogin: boolean;
-  onAuth: (email: string, password: string) => void;
+  onAuth: () => void;
   onBack: () => void;
   onToggleMode: () => void;
 }
@@ -14,24 +16,56 @@ interface AuthScreenProps {
 const AuthScreen = ({ isLogin, onAuth, onBack, onToggleMode }: AuthScreenProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { signUp, signIn } = useAuth();
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isLogin && password !== confirmPassword) {
-      alert('Passwords do not match');
-      return;
-    }
-    
     setIsLoading(true);
-    
-    // Simulate auth process
-    setTimeout(() => {
-      onAuth(email, password);
+
+    try {
+      if (isLogin) {
+        const { error } = await signIn(email, password);
+        if (error) {
+          toast({
+            title: "Error signing in",
+            description: error.message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Welcome back!",
+            description: "You have been signed in successfully.",
+          });
+          onAuth();
+        }
+      } else {
+        const { error } = await signUp(email, password, fullName);
+        if (error) {
+          toast({
+            title: "Error creating account",
+            description: error.message,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Account created!",
+            description: "Please check your email to verify your account.",
+          });
+          onAuth();
+        }
+      }
+    } catch (error) {
+      toast({
+        title: "An error occurred",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -57,6 +91,21 @@ const AuthScreen = ({ isLogin, onAuth, onBack, onToggleMode }: AuthScreenProps) 
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
+          {!isLogin && (
+            <div>
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Enter your full name"
+                required
+                className="mt-2"
+              />
+            </div>
+          )}
+
           <div>
             <Label htmlFor="email">Email</Label>
             <Input
@@ -82,21 +131,6 @@ const AuthScreen = ({ isLogin, onAuth, onBack, onToggleMode }: AuthScreenProps) 
               className="mt-2"
             />
           </div>
-
-          {!isLogin && (
-            <div>
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                required
-                className="mt-2"
-              />
-            </div>
-          )}
 
           <Button 
             type="submit"
