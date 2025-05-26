@@ -59,4 +59,66 @@
   .category-tag {
     @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
   }
+
+  /* Custom DoLater colors */
+  .text-dolater-text-primary {
+    @apply text-gray-900;
+  }
+  
+  .text-dolater-text-secondary {
+    @apply text-gray-600;
+  }
+  
+  .bg-dolater-mint {
+    @apply bg-emerald-500;
+  }
+  
+  .text-dolater-mint {
+    @apply text-emerald-500;
+  }
+  
+  .bg-dolater-mint-light {
+    @apply bg-emerald-50;
+  }
+  
+  .bg-dolater-mint-dark {
+    @apply bg-emerald-600;
+  }
+  
+  .bg-dolater-yellow {
+    @apply bg-yellow-400;
+  }
+  
+  .text-dolater-yellow {
+    @apply text-yellow-600;
+  }
+  
+  .bg-dolater-gray {
+    @apply bg-gray-100;
+  }
+  
+  .bg-category-fitness {
+    @apply bg-green-500;
+  }
+  
+  .bg-category-finance {
+    @apply bg-blue-500;
+  }
+  
+  .bg-category-knowledge {
+    @apply bg-purple-500;
+  }
+  
+  .bg-category-personal {
+    @apply bg-pink-500;
+  }
+  
+  .bg-category-work {
+    @apply bg-indigo-500;
+  }
+  
+  .bg-category-urgent {
+    @apply bg-red-500;
+  }
 }
+
