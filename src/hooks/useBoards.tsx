@@ -27,8 +27,8 @@ export const useBoards = () => {
     }
 
     try {
-      // Fetch boards with item counts
-      const { data: boardsData, error: boardsError } = await supabase
+      // Use any type to bypass TypeScript issues until types are regenerated
+      const { data: boardsData, error: boardsError } = await (supabase as any)
         .from('boards')
         .select(`
           *,
@@ -47,7 +47,7 @@ export const useBoards = () => {
         return;
       }
 
-      const formattedBoards: Board[] = boardsData.map(board => ({
+      const formattedBoards: Board[] = (boardsData || []).map((board: any) => ({
         id: board.id,
         name: board.name,
         description: board.description,
@@ -73,7 +73,7 @@ export const useBoards = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('boards')
         .insert({
           user_id: user.id,
