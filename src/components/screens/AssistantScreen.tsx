@@ -1,7 +1,6 @@
 
 import { useState } from 'react';
 import { Sparkles, Send, Zap, FileText, Calendar, CheckSquare } from 'lucide-react';
-import AISearchBar from '../AISearchBar';
 
 const AssistantScreen = () => {
   const [messages, setMessages] = useState([
@@ -27,6 +26,7 @@ const AssistantScreen = () => {
 
     setMessages(prev => [...prev, newMessage]);
     setInputMessage('');
+    setIsAILoading(true);
 
     // Simulate AI response
     setTimeout(() => {
@@ -37,32 +37,8 @@ const AssistantScreen = () => {
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, aiResponse]);
-    }, 1000);
-  };
-
-  const handleAISearch = (query: string) => {
-    setIsAILoading(true);
-    
-    const aiMessage = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: query,
-      timestamp: new Date().toISOString()
-    };
-
-    setMessages(prev => [...prev, aiMessage]);
-
-    // Simulate AI processing
-    setTimeout(() => {
-      const aiResponse = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: `I found relevant content for "${query}". Here's what I can create for you:\n\n📋 **7-Day Action Plan**\n• Day 1-2: Research and planning\n• Day 3-4: Setup and preparation\n• Day 5-7: Implementation\n\n🎯 **Key Action Items**\n• Review your saved content\n• Create specific goals\n• Set daily reminders\n\nWould you like me to export this as a detailed plan? This feature is available with DoLater Pro.`,
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, aiResponse]);
       setIsAILoading(false);
-    }, 2000);
+    }, 1000);
   };
 
   const quickActions = [
@@ -70,6 +46,13 @@ const AssistantScreen = () => {
     { icon: CheckSquare, label: 'Build Habits', color: 'bg-dolater-yellow' },
     { icon: Calendar, label: 'Schedule', color: 'bg-purple-500' },
     { icon: Zap, label: 'Quick Action', color: 'bg-orange-500' }
+  ];
+
+  const suggestions = [
+    "Create a workout plan from my fitness saves",
+    "Summarize money tips into actionable steps", 
+    "Build a content calendar from growth hacks",
+    "Make a shopping list from recipe saves"
   ];
 
   return (
@@ -87,15 +70,6 @@ const AssistantScreen = () => {
         </div>
       </div>
 
-      {/* AI Search Bar */}
-      <div className="bg-white border-b border-gray-200 p-4">
-        <AISearchBar 
-          onAISearch={handleAISearch}
-          isLoading={isAILoading}
-          isPro={false}
-        />
-      </div>
-
       {/* Quick Actions */}
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="text-xs font-medium text-dolater-text-secondary mb-3">Quick Actions</div>
@@ -105,6 +79,7 @@ const AssistantScreen = () => {
             return (
               <button
                 key={index}
+                onClick={() => setInputMessage(`Help me with ${action.label.toLowerCase()}`)}
                 className={`${action.color} text-white p-3 rounded-lg flex flex-col items-center space-y-1 hover:opacity-90 transition-opacity`}
               >
                 <Icon size={16} />
@@ -112,6 +87,22 @@ const AssistantScreen = () => {
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* Suggestions */}
+      <div className="bg-white border-b border-gray-200 p-4">
+        <div className="text-xs font-medium text-dolater-text-secondary mb-3">Try asking:</div>
+        <div className="space-y-2">
+          {suggestions.map((suggestion, index) => (
+            <button
+              key={index}
+              onClick={() => setInputMessage(suggestion)}
+              className="w-full text-left p-2 text-sm text-dolater-text-secondary bg-dolater-gray rounded hover:bg-gray-200 transition-colors"
+            >
+              "{suggestion}"
+            </button>
+          ))}
         </div>
       </div>
 
@@ -157,14 +148,14 @@ const AssistantScreen = () => {
         )}
       </div>
 
-      {/* Input Area */}
+      {/* Single Input Area */}
       <div className="bg-white border-t border-gray-200 p-4">
         <div className="flex space-x-3">
           <input
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Ask me anything..."
+            placeholder="Ask me to create plans, organize content, or build habits from your saves..."
             className="flex-1 p-3 border border-gray-200 rounded-lg text-sm focus:border-dolater-mint focus:ring-1 focus:ring-dolater-mint"
           />
           <button
