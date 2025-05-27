@@ -65,6 +65,69 @@ export type Database = {
           },
         ]
       }
+      content_items: {
+        Row: {
+          action_type: string | null
+          category: string
+          created_at: string
+          has_checklist: boolean | null
+          has_notes: boolean | null
+          id: string
+          is_completed: boolean | null
+          platform: string | null
+          priority: string
+          reminder_set: boolean | null
+          summary: string | null
+          tags: string[] | null
+          title: string
+          transcript: string | null
+          updated_at: string
+          url: string
+          user_id: string
+          user_notes: string | null
+        }
+        Insert: {
+          action_type?: string | null
+          category: string
+          created_at?: string
+          has_checklist?: boolean | null
+          has_notes?: boolean | null
+          id?: string
+          is_completed?: boolean | null
+          platform?: string | null
+          priority?: string
+          reminder_set?: boolean | null
+          summary?: string | null
+          tags?: string[] | null
+          title: string
+          transcript?: string | null
+          updated_at?: string
+          url: string
+          user_id: string
+          user_notes?: string | null
+        }
+        Update: {
+          action_type?: string | null
+          category?: string
+          created_at?: string
+          has_checklist?: boolean | null
+          has_notes?: boolean | null
+          id?: string
+          is_completed?: boolean | null
+          platform?: string | null
+          priority?: string
+          reminder_set?: boolean | null
+          summary?: string | null
+          tags?: string[] | null
+          title?: string
+          transcript?: string | null
+          updated_at?: string
+          url?: string
+          user_id?: string
+          user_notes?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

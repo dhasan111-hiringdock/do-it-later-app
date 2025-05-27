@@ -46,8 +46,7 @@ export const useContentItems = () => {
     }
 
     try {
-      // Use any type to bypass TypeScript issues until types are regenerated
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('content_items')
         .select('*')
         .eq('user_id', user.id)
@@ -63,7 +62,7 @@ export const useContentItems = () => {
         return;
       }
 
-      const formattedItems: ContentItem[] = (data || []).map((item: any) => ({
+      const formattedItems: ContentItem[] = (data || []).map((item) => ({
         id: item.id,
         title: item.title,
         summary: item.summary || '',
@@ -100,7 +99,7 @@ export const useContentItems = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('content_items')
         .insert({
           user_id: user.id,
