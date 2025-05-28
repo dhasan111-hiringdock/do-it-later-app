@@ -7,6 +7,7 @@ import AssistantScreen from './screens/AssistantScreen';
 import BoardsScreen from './screens/BoardsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import ShareReceiver from './ShareReceiver';
+import { SubscriptionProvider } from '@/hooks/useSubscription';
 
 export type TabType = 'home' | 'add' | 'assistant' | 'boards' | 'profile';
 
@@ -31,13 +32,15 @@ const MobileApp = () => {
   };
 
   return (
-    <div className="mobile-container">
-      <ShareReceiver />
-      <div className="content-area">
-        {renderScreen()}
+    <SubscriptionProvider>
+      <div className="mobile-container">
+        <ShareReceiver />
+        <div className="content-area">
+          {renderScreen()}
+        </div>
+        <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
-      <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
-    </div>
+    </SubscriptionProvider>
   );
 };
 

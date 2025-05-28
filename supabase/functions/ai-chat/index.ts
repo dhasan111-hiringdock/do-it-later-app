@@ -8,35 +8,54 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[AI-CHAT] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    logStep("Function started");
+
     const { messages, conversationId } = await req.json();
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
     if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured');
+      throw new Error('OpenAI API key not configured. Please check your edge function secrets.');
     }
+
+    logStep("OpenAI API key found");
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get auth header and create authenticated client
-    const authHeader = req.headers.get('Authorization')!;
-    const supabaseAuth = createClient(supabaseUrl, supabaseKey, {
+    // Get auth header and create authenticated client for user operations
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No authorization header provided');
+    }
+
+    const supabaseAuth = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
       global: { headers: { Authorization: authHeader } }
     });
 
+    logStep("Supabase clients initialized");
+
     // Get user's content items for context
-    const { data: contentItems } = await supabaseAuth
+    const { data: contentItems, error: contentError } = await supabaseAuth
       .from('content_items')
       .select('*')
       .limit(10);
+
+    if (contentError) {
+      logStep("Error fetching content items", { error: contentError });
+    }
 
     const contextPrompt = contentItems && contentItems.length > 0 
       ? `Here are some of the user's saved content items for context: ${JSON.stringify(contentItems.map(item => ({ title: item.title, summary: item.summary, category: item.category })))}`
@@ -55,6 +74,8 @@ ${contextPrompt}
 Be helpful, actionable, and concise. Focus on turning saved content into achievable goals.`
     };
 
+    logStep("Making OpenAI API request");
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -70,15 +91,19 @@ Be helpful, actionable, and concise. Focus on turning saved content into achieva
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
+      const errorText = await response.text();
+      logStep("OpenAI API error", { status: response.status, statusText: response.statusText, error: errorText });
+      throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
     const assistantMessage = data.choices[0].message;
 
+    logStep("OpenAI response received", { messageLength: assistantMessage.content.length });
+
     // Save conversation if conversationId provided
     if (conversationId) {
-      await supabaseAuth
+      const { error: insertError } = await supabase
         .from('ai_messages')
         .insert([
           {
@@ -92,14 +117,21 @@ Be helpful, actionable, and concise. Focus on turning saved content into achieva
             content: assistantMessage.content
           }
         ]);
+
+      if (insertError) {
+        logStep("Error saving conversation", { error: insertError });
+      } else {
+        logStep("Conversation saved successfully");
+      }
     }
 
     return new Response(JSON.stringify({ message: assistantMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error in ai-chat function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR in ai-chat function", { message: errorMessage });
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
