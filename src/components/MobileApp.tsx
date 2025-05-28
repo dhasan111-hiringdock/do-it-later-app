@@ -6,6 +6,7 @@ import AddScreen from './screens/AddScreen';
 import AssistantScreen from './screens/AssistantScreen';
 import BoardsScreen from './screens/BoardsScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import ShareReceiver from './ShareReceiver';
 
 export type TabType = 'home' | 'add' | 'assistant' | 'boards' | 'profile';
 
@@ -31,6 +32,7 @@ const MobileApp = () => {
 
   return (
     <div className="mobile-container">
+      <ShareReceiver />
       <div className="content-area">
         {renderScreen()}
       </div>

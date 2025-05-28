@@ -1,9 +1,19 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sparkles, Send, Zap, FileText, Calendar, CheckSquare } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+
+interface Message {
+  id: string;
+  type: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
 
 const AssistantScreen = () => {
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       type: 'assistant',
@@ -13,11 +23,41 @@ const AssistantScreen = () => {
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isAILoading, setIsAILoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
+  // Create conversation on component mount
+  useEffect(() => {
+    if (user && !conversationId) {
+      createConversation();
+    }
+  }, [user]);
 
-    const newMessage = {
+  const createConversation = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .insert({
+          user_id: user.id,
+          title: 'AI Assistant Chat'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setConversationId(data.id);
+    } catch (error) {
+      console.error('Error creating conversation:', error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || !user) return;
+
+    const newMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
       content: inputMessage,
@@ -28,17 +68,43 @@ const AssistantScreen = () => {
     setInputMessage('');
     setIsAILoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse = {
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          messages: [{ role: 'user', content: inputMessage }],
+          conversationId
+        }
+      });
+
+      if (error) throw error;
+
+      const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: "That's a great goal! Let me help you create a step-by-step plan. This feature is available in DoLater Pro. Would you like to upgrade to unlock the full AI Assistant?",
+        content: data.message.content,
         timestamp: new Date().toISOString()
       };
+
       setMessages(prev => [...prev, aiResponse]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to get AI response. Please try again.",
+        variant: "destructive",
+      });
+
+      // Fallback response
+      const fallbackResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'assistant',
+        content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment. In the meantime, you can explore your saved content and organize it into boards!",
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, fallbackResponse]);
+    } finally {
       setIsAILoading(false);
-    }, 1000);
+    }
   };
 
   const quickActions = [
@@ -148,7 +214,7 @@ const AssistantScreen = () => {
         )}
       </div>
 
-      {/* Single Input Area */}
+      {/* Input Area */}
       <div className="bg-white border-t border-gray-200 p-4">
         <div className="flex space-x-3">
           <input
@@ -160,7 +226,7 @@ const AssistantScreen = () => {
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputMessage.trim()}
+            disabled={!inputMessage.trim() || isAILoading}
             className="bg-dolater-mint text-white p-3 rounded-lg disabled:opacity-50 hover:bg-dolater-mint-dark transition-colors"
           >
             <Send size={16} />
@@ -168,16 +234,16 @@ const AssistantScreen = () => {
         </div>
       </div>
 
-      {/* Pro Upgrade Banner */}
-      <div className="bg-gradient-to-r from-dolater-yellow to-yellow-400 p-4">
+      {/* Pro Features Available Banner */}
+      <div className="bg-gradient-to-r from-green-500 to-green-600 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-sm text-dolater-text-primary">Unlock Full AI Assistant</h3>
-            <p className="text-xs text-dolater-text-primary opacity-80">Get unlimited plans, habits & coaching</p>
+            <h3 className="font-semibold text-sm text-white">AI Assistant Active!</h3>
+            <p className="text-xs text-white opacity-90">Full AI functionality enabled</p>
           </div>
-          <button className="bg-white text-dolater-mint px-4 py-2 rounded-lg text-xs font-medium hover:bg-gray-50 transition-colors">
-            Upgrade Pro
-          </button>
+          <div className="bg-white text-green-600 px-3 py-1 rounded-full text-xs font-medium">
+            ✓ Ready
+          </div>
         </div>
       </div>
     </div>
