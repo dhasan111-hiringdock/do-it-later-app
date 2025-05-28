@@ -25,10 +25,27 @@ serve(async (req) => {
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
     if (!openAIApiKey) {
-      throw new Error('OpenAI API key not configured. Please check your edge function secrets.');
+      logStep("ERROR: OpenAI API key not found");
+      return new Response(JSON.stringify({ 
+        error: 'OpenAI API key not configured. Please check your edge function secrets.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    logStep("OpenAI API key found");
+    // Test API key format
+    if (!openAIApiKey.startsWith('sk-')) {
+      logStep("ERROR: Invalid API key format");
+      return new Response(JSON.stringify({ 
+        error: 'Invalid OpenAI API key format. Please check your API key.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    logStep("OpenAI API key found and validated");
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -38,7 +55,11 @@ serve(async (req) => {
     // Get auth header and create authenticated client for user operations
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No authorization header provided');
+      logStep("ERROR: No authorization header");
+      return new Response(JSON.stringify({ error: 'No authorization header provided' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabaseAuth = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -93,6 +114,16 @@ Be helpful, actionable, and concise. Focus on turning saved content into achieva
     if (!response.ok) {
       const errorText = await response.text();
       logStep("OpenAI API error", { status: response.status, statusText: response.statusText, error: errorText });
+      
+      if (response.status === 401) {
+        return new Response(JSON.stringify({ 
+          error: 'Invalid OpenAI API key. Please check your API key is correct and has sufficient credits.' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 

@@ -1,9 +1,10 @@
-
 import { useState, useEffect } from 'react';
-import { Sparkles, Send, Zap, FileText, Calendar, CheckSquare } from 'lucide-react';
+import { Sparkles, Send, Zap, FileText, Calendar, CheckSquare, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
+import APIStatusIndicator from '../APIStatusIndicator';
 
 interface Message {
   id: string;
@@ -24,7 +25,9 @@ const AssistantScreen = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isAILoading, setIsAILoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [apiKeyError, setApiKeyError] = useState(false);
   const { user } = useAuth();
+  const { subscribed } = useSubscription();
   const { toast } = useToast();
 
   // Create conversation on component mount
@@ -57,6 +60,16 @@ const AssistantScreen = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !user) return;
 
+    // Check if user has access to AI features
+    if (!subscribed) {
+      toast({
+        title: "Pro Feature",
+        description: "AI Assistant is available with DoLater Pro. Upgrade to unlock unlimited AI conversations!",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const newMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
@@ -67,6 +80,7 @@ const AssistantScreen = () => {
     setMessages(prev => [...prev, newMessage]);
     setInputMessage('');
     setIsAILoading(true);
+    setApiKeyError(false);
 
     try {
       const { data, error } = await supabase.functions.invoke('ai-chat', {
@@ -76,7 +90,18 @@ const AssistantScreen = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        throw error;
+      }
+
+      if (data.error) {
+        if (data.error.includes('API key') || data.error.includes('Invalid OpenAI')) {
+          setApiKeyError(true);
+          throw new Error('AI service configuration error. Please check your OpenAI API key.');
+        }
+        throw new Error(data.error);
+      }
 
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
@@ -88,9 +113,21 @@ const AssistantScreen = () => {
       setMessages(prev => [...prev, aiResponse]);
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      let errorMessage = "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('API key')) {
+          errorMessage = "There's an issue with the AI service configuration. Please check your API key settings.";
+          setApiKeyError(true);
+        } else if (error.message.includes('credits') || error.message.includes('quota')) {
+          errorMessage = "The AI service has reached its usage limit. Please try again later.";
+        }
+      }
+
       toast({
-        title: "Error",
-        description: "Failed to get AI response. Please try again.",
+        title: "AI Assistant Error",
+        description: errorMessage,
         variant: "destructive",
       });
 
@@ -98,7 +135,7 @@ const AssistantScreen = () => {
       const fallbackResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: "I'm sorry, I'm having trouble connecting right now. Please try again in a moment. In the meantime, you can explore your saved content and organize it into boards!",
+        content: errorMessage + " In the meantime, you can explore your saved content and organize it into boards!",
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, fallbackResponse]);
@@ -125,16 +162,33 @@ const AssistantScreen = () => {
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-dolater-mint to-dolater-mint-dark rounded-full flex items-center justify-center">
-            <Sparkles size={20} className="text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-gradient-to-r from-dolater-mint to-dolater-mint-dark rounded-full flex items-center justify-center">
+              <Sparkles size={20} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-dolater-text-primary">AI Assistant</h1>
+              <p className="text-xs text-dolater-text-secondary">Your personal productivity coach</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-dolater-text-primary">AI Assistant</h1>
-            <p className="text-xs text-dolater-text-secondary">Your personal productivity coach</p>
-          </div>
+          <APIStatusIndicator />
         </div>
       </div>
+
+      {/* API Key Error Banner */}
+      {apiKeyError && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex">
+            <AlertCircle className="h-5 w-5 text-red-400" />
+            <div className="ml-3">
+              <p className="text-sm text-red-700">
+                AI service configuration issue. Please check your OpenAI API key settings.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div className="bg-white border-b border-gray-200 p-4">
@@ -146,7 +200,8 @@ const AssistantScreen = () => {
               <button
                 key={index}
                 onClick={() => setInputMessage(`Help me with ${action.label.toLowerCase()}`)}
-                className={`${action.color} text-white p-3 rounded-lg flex flex-col items-center space-y-1 hover:opacity-90 transition-opacity`}
+                disabled={!subscribed}
+                className={`${action.color} text-white p-3 rounded-lg flex flex-col items-center space-y-1 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <Icon size={16} />
                 <span className="text-xs font-medium">{action.label}</span>
@@ -163,8 +218,9 @@ const AssistantScreen = () => {
           {suggestions.map((suggestion, index) => (
             <button
               key={index}
-              onClick={() => setInputMessage(suggestion)}
-              className="w-full text-left p-2 text-sm text-dolater-text-secondary bg-dolater-gray rounded hover:bg-gray-200 transition-colors"
+              onClick={() => subscribed && setInputMessage(suggestion)}
+              disabled={!subscribed}
+              className="w-full text-left p-2 text-sm text-dolater-text-secondary bg-dolater-gray rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               "{suggestion}"
             </button>
@@ -221,28 +277,33 @@ const AssistantScreen = () => {
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder="Ask me to create plans, organize content, or build habits from your saves..."
-            className="flex-1 p-3 border border-gray-200 rounded-lg text-sm focus:border-dolater-mint focus:ring-1 focus:ring-dolater-mint"
+            placeholder={subscribed ? "Ask me to create plans, organize content, or build habits from your saves..." : "Upgrade to Pro to chat with AI Assistant..."}
+            disabled={!subscribed}
+            className="flex-1 p-3 border border-gray-200 rounded-lg text-sm focus:border-dolater-mint focus:ring-1 focus:ring-dolater-mint disabled:bg-gray-100 disabled:cursor-not-allowed"
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isAILoading}
-            className="bg-dolater-mint text-white p-3 rounded-lg disabled:opacity-50 hover:bg-dolater-mint-dark transition-colors"
+            disabled={!inputMessage.trim() || isAILoading || !subscribed}
+            className="bg-dolater-mint text-white p-3 rounded-lg disabled:opacity-50 hover:bg-dolater-mint-dark transition-colors disabled:cursor-not-allowed"
           >
             <Send size={16} />
           </button>
         </div>
       </div>
 
-      {/* Pro Features Available Banner */}
-      <div className="bg-gradient-to-r from-green-500 to-green-600 p-4">
+      {/* Pro Features Banner */}
+      <div className={`${subscribed ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-dolater-yellow to-yellow-400'} p-4`}>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-sm text-white">AI Assistant Active!</h3>
-            <p className="text-xs text-white opacity-90">Full AI functionality enabled</p>
+            <h3 className="font-semibold text-sm text-white">
+              {subscribed ? 'AI Assistant Active!' : 'Upgrade for AI Assistant'}
+            </h3>
+            <p className="text-xs text-white opacity-90">
+              {subscribed ? 'Full AI functionality enabled' : 'Get unlimited AI conversations with Pro'}
+            </p>
           </div>
-          <div className="bg-white text-green-600 px-3 py-1 rounded-full text-xs font-medium">
-            ✓ Ready
+          <div className={`${subscribed ? 'bg-white text-green-600' : 'bg-white text-dolater-text-primary'} px-3 py-1 rounded-full text-xs font-medium`}>
+            {subscribed ? '✓ Ready' : 'Pro Only'}
           </div>
         </div>
       </div>
