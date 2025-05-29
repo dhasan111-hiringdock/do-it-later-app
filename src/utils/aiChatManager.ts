@@ -46,7 +46,7 @@ class AIChatManager {
 
       if (error) {
         console.error(`[AI Chat Manager] Supabase error:`, error);
-        throw new Error(`Supabase error: ${error.message}`);
+        throw new Error(`Connection error: ${error.message}`);
       }
 
       if (data.error) {
@@ -56,11 +56,15 @@ class AIChatManager {
         if (data.error.includes('API key') || data.error.includes('OpenAI')) {
           throw new Error('API_KEY_ERROR');
         }
-        if (data.error.includes('credits') || data.error.includes('quota') || data.error.includes('rate limit')) {
+        if (data.error.includes('Rate limit') || data.error.includes('rate limit')) {
           throw new Error('RATE_LIMIT_ERROR');
         }
         
         throw new Error(data.error);
+      }
+
+      if (!data.message || !data.message.content) {
+        throw new Error('Invalid response from AI service');
       }
 
       console.log(`[AI Chat Manager] Success on attempt ${attempt}`);
@@ -78,7 +82,7 @@ class AIChatManager {
       if (errorMessage === 'API_KEY_ERROR') {
         return {
           success: false,
-          error: 'API key configuration error. Please check your OpenAI settings.'
+          error: 'API key configuration issue. Please check your OpenAI settings.'
         };
       }
       
@@ -102,16 +106,16 @@ class AIChatManager {
       
       return {
         success: false,
-        error: `Failed after ${this.maxRetries} attempts: ${errorMessage}`
+        error: `Service temporarily unavailable: ${errorMessage}`
       };
     }
   }
 
   private generateFallbackResponse(userMessage: string): string {
     const fallbackResponses = [
-      "I'm having trouble connecting to the AI service right now. In the meantime, you can organize your saved content into boards or try asking me again in a moment.",
-      "The AI service is temporarily unavailable. You can still browse your saved content and organize it while I try to reconnect.",
-      "I'm experiencing some technical difficulties. Please try your request again, or feel free to explore your content library in the meantime."
+      "I'm having trouble connecting right now. Please try again in a moment, or explore your saved content while I recover.",
+      "The AI service is temporarily unavailable. You can still browse and organize your content while I reconnect.",
+      "I'm experiencing technical difficulties. Please try your request again in a few moments."
     ];
     
     // Simple keyword-based fallback logic

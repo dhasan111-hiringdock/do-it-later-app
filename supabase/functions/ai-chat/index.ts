@@ -34,18 +34,18 @@ serve(async (req) => {
       });
     }
 
-    // Test API key format
-    if (!openAIApiKey.startsWith('sk-')) {
-      logStep("ERROR: Invalid API key format");
+    // More flexible API key validation - just check if it exists and has some content
+    if (!openAIApiKey.trim() || openAIApiKey.length < 10) {
+      logStep("ERROR: Invalid API key - too short or empty");
       return new Response(JSON.stringify({ 
-        error: 'Invalid OpenAI API key format. Please check your API key.' 
+        error: 'Invalid OpenAI API key. Please check your API key configuration.' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    logStep("OpenAI API key found and validated");
+    logStep("OpenAI API key found and validated", { keyLength: openAIApiKey.length });
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -124,13 +124,28 @@ Be helpful, actionable, and concise. Focus on turning saved content into achieva
         });
       }
       
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ 
+          error: 'Rate limit exceeded. Please try again in a moment.' 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
       throw new Error(`OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      logStep("Invalid response structure from OpenAI", { data });
+      throw new Error('Invalid response from OpenAI API');
+    }
+
     const assistantMessage = data.choices[0].message;
 
-    logStep("OpenAI response received", { messageLength: assistantMessage.content.length });
+    logStep("OpenAI response received", { messageLength: assistantMessage.content?.length || 0 });
 
     // Save conversation if conversationId provided
     if (conversationId) {
@@ -162,7 +177,7 @@ Be helpful, actionable, and concise. Focus on turning saved content into achieva
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in ai-chat function", { message: errorMessage });
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ error: `AI service temporarily unavailable: ${errorMessage}` }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
