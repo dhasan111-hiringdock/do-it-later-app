@@ -1,139 +1,39 @@
 
-import { useState, useEffect } from 'react';
-import { Sparkles, Send, Zap, FileText, Calendar, CheckSquare, AlertCircle } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState } from 'react';
+import { Sparkles, Send, Zap, FileText, Calendar, CheckSquare, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAIChat } from '@/hooks/useAIChat';
 import { useToast } from '@/hooks/use-toast';
-import { useSubscription } from '@/hooks/useSubscription';
-import APIStatusIndicator from '../APIStatusIndicator';
-
-interface Message {
-  id: string;
-  type: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-}
 
 const AssistantScreen = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      type: 'assistant',
-      content: "Hi! I'm your DoLater AI Assistant. I can help you create action plans, build habits, and turn your saved content into achievable goals. What would you like to work on today?",
-      timestamp: new Date().toISOString()
-    }
-  ]);
   const [inputMessage, setInputMessage] = useState('');
-  const [isAILoading, setIsAILoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [apiKeyError, setApiKeyError] = useState(false);
   const { user } = useAuth();
-  const { subscribed } = useSubscription();
   const { toast } = useToast();
-
-  // Force premium access for testing
-  const hasAccess = true;
-
-  useEffect(() => {
-    if (user && !conversationId) {
-      createConversation();
-    }
-  }, [user]);
-
-  const createConversation = async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('ai_conversations')
-        .insert({
-          user_id: user.id,
-          title: 'AI Assistant Chat'
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      setConversationId(data.id);
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-    }
-  };
+  const { messages, sendMessage, isLoading, apiStatus, checkHealth, clearChat } = useAIChat();
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !user) return;
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: inputMessage,
-      timestamp: new Date().toISOString()
-    };
-
-    setMessages(prev => [...prev, newMessage]);
+    
+    const message = inputMessage;
     setInputMessage('');
-    setIsAILoading(true);
-    setApiKeyError(false);
+    await sendMessage(message);
+  };
 
-    try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
-          messages: [{ role: 'user', content: inputMessage }],
-          conversationId
-        }
-      });
-
-      if (error) {
-        console.error('Edge function error:', error);
-        throw error;
-      }
-
-      if (data.error) {
-        if (data.error.includes('API key') || data.error.includes('Invalid OpenAI')) {
-          setApiKeyError(true);
-          throw new Error('AI service configuration error. Please check your OpenAI API key.');
-        }
-        throw new Error(data.error);
-      }
-
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: data.message.content,
-        timestamp: new Date().toISOString()
-      };
-
-      setMessages(prev => [...prev, aiResponse]);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      let errorMessage = "I'm sorry, I'm having trouble connecting right now. Please try again in a moment.";
-      
-      if (error instanceof Error) {
-        if (error.message.includes('API key')) {
-          errorMessage = "There's an issue with the AI service configuration. Please check your API key settings.";
-          setApiKeyError(true);
-        } else if (error.message.includes('credits') || error.message.includes('quota')) {
-          errorMessage = "The AI service has reached its usage limit. Please try again later.";
-        }
-      }
-
-      toast({
-        title: "AI Assistant Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-
-      const fallbackResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'assistant',
-        content: errorMessage + " In the meantime, you can explore your saved content and organize it into boards!",
-        timestamp: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, fallbackResponse]);
-    } finally {
-      setIsAILoading(false);
-    }
+  const handleRetryConnection = async () => {
+    toast({
+      title: "Checking Connection",
+      description: "Testing AI service connection...",
+    });
+    
+    const isHealthy = await checkHealth();
+    
+    toast({
+      title: isHealthy ? "Connection Restored" : "Connection Failed",
+      description: isHealthy 
+        ? "AI Assistant is back online!"
+        : "Still having connection issues. Please try again in a moment.",
+      variant: isHealthy ? "default" : "destructive",
+    });
   };
 
   const quickActions = [
@@ -150,6 +50,22 @@ const AssistantScreen = () => {
     "Make a shopping list from recipe saves"
   ];
 
+  const getStatusColor = () => {
+    switch (apiStatus) {
+      case 'healthy': return 'text-green-600';
+      case 'error': return 'text-red-600';
+      default: return 'text-yellow-600';
+    }
+  };
+
+  const getStatusText = () => {
+    switch (apiStatus) {
+      case 'healthy': return 'AI Connected';
+      case 'error': return 'Connection Issues';
+      default: return 'Checking Status';
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
@@ -164,18 +80,38 @@ const AssistantScreen = () => {
               <p className="text-xs text-dolater-text-secondary">Your personal productivity coach</p>
             </div>
           </div>
-          <APIStatusIndicator />
+          <div className="flex items-center space-x-2">
+            <div className={`text-xs ${getStatusColor()}`}>
+              {getStatusText()}
+            </div>
+            {apiStatus === 'error' && (
+              <button
+                onClick={handleRetryConnection}
+                className="text-blue-600 hover:text-blue-800 p-1"
+                title="Retry connection"
+              >
+                <RefreshCw size={14} />
+              </button>
+            )}
+            <button
+              onClick={clearChat}
+              className="text-gray-500 hover:text-gray-700 text-xs underline"
+              title="Clear chat"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* API Key Error Banner */}
-      {apiKeyError && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+      {/* Connection Warning */}
+      {apiStatus === 'error' && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
           <div className="flex">
-            <AlertCircle className="h-5 w-5 text-red-400" />
+            <AlertCircle className="h-5 w-5 text-yellow-400" />
             <div className="ml-3">
-              <p className="text-sm text-red-700">
-                AI service configuration issue. Please check your OpenAI API key settings.
+              <p className="text-sm text-yellow-700">
+                AI Assistant is experiencing connection issues. Responses may be limited.
               </p>
             </div>
           </div>
@@ -229,12 +165,21 @@ const AssistantScreen = () => {
               className={`max-w-[85%] p-3 rounded-lg ${
                 message.type === 'user'
                   ? 'bg-dolater-mint text-white rounded-br-sm'
+                  : message.isError
+                  ? 'bg-red-50 border border-red-200 text-red-800 rounded-bl-sm'
                   : 'bg-white card-shadow text-dolater-text-primary rounded-bl-sm'
               }`}
             >
+              {message.isRetrying && (
+                <div className="text-xs text-orange-600 mb-2 flex items-center">
+                  <RefreshCw size={12} className="animate-spin mr-1" />
+                  Retrying...
+                </div>
+              )}
               <p className="text-sm whitespace-pre-line">{message.content}</p>
               <span className={`text-xs mt-2 block ${
-                message.type === 'user' ? 'text-green-100' : 'text-dolater-text-secondary'
+                message.type === 'user' ? 'text-green-100' : 
+                message.isError ? 'text-red-600' : 'text-dolater-text-secondary'
               }`}>
                 {new Date(message.timestamp).toLocaleTimeString([], { 
                   hour: '2-digit', 
@@ -244,7 +189,7 @@ const AssistantScreen = () => {
             </div>
           </div>
         ))}
-        {isAILoading && (
+        {isLoading && (
           <div className="flex justify-start">
             <div className="bg-white card-shadow text-dolater-text-primary max-w-[85%] p-3 rounded-lg rounded-bl-sm">
               <div className="flex items-center space-x-2">
@@ -269,10 +214,11 @@ const AssistantScreen = () => {
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
             placeholder="Ask me to create plans, organize content, or build habits from your saves..."
             className="flex-1 p-3 border border-gray-200 rounded-lg text-sm focus:border-dolater-mint focus:ring-1 focus:ring-dolater-mint"
+            disabled={isLoading}
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isAILoading}
+            disabled={!inputMessage.trim() || isLoading}
             className="bg-dolater-mint text-white p-3 rounded-lg disabled:opacity-50 hover:bg-dolater-mint-dark transition-colors disabled:cursor-not-allowed"
           >
             <Send size={16} />
@@ -284,11 +230,16 @@ const AssistantScreen = () => {
       <div className="bg-gradient-to-r from-green-500 to-green-600 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-sm text-white">AI Assistant Active (Testing Mode)</h3>
-            <p className="text-xs text-white opacity-90">Full AI functionality enabled for testing</p>
+            <h3 className="font-semibold text-sm text-white">AI Assistant Enhanced (Testing Mode)</h3>
+            <p className="text-xs text-white opacity-90">Advanced error handling and retry logic active</p>
           </div>
-          <div className="bg-white text-green-600 px-3 py-1 rounded-full text-xs font-medium">
-            ✓ Ready
+          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+            apiStatus === 'healthy' ? 'bg-white text-green-600' :
+            apiStatus === 'error' ? 'bg-red-100 text-red-600' :
+            'bg-yellow-100 text-yellow-600'
+          }`}>
+            {apiStatus === 'healthy' ? '✓ Ready' :
+             apiStatus === 'error' ? '⚠ Issues' : '⏳ Checking'}
           </div>
         </div>
       </div>
