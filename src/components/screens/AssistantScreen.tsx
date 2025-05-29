@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Sparkles, Send, Zap, FileText, Calendar, CheckSquare, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +31,9 @@ const AssistantScreen = () => {
   const { subscribed } = useSubscription();
   const { toast } = useToast();
 
-  // Create conversation on component mount
+  // Force premium access for testing
+  const hasAccess = true;
+
   useEffect(() => {
     if (user && !conversationId) {
       createConversation();
@@ -59,16 +62,6 @@ const AssistantScreen = () => {
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !user) return;
-
-    // Check if user has access to AI features
-    if (!subscribed) {
-      toast({
-        title: "Pro Feature",
-        description: "AI Assistant is available with DoLater Pro. Upgrade to unlock unlimited AI conversations!",
-        variant: "destructive",
-      });
-      return;
-    }
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -131,7 +124,6 @@ const AssistantScreen = () => {
         variant: "destructive",
       });
 
-      // Fallback response
       const fallbackResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
@@ -200,8 +192,7 @@ const AssistantScreen = () => {
               <button
                 key={index}
                 onClick={() => setInputMessage(`Help me with ${action.label.toLowerCase()}`)}
-                disabled={!subscribed}
-                className={`${action.color} text-white p-3 rounded-lg flex flex-col items-center space-y-1 hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`${action.color} text-white p-3 rounded-lg flex flex-col items-center space-y-1 hover:opacity-90 transition-opacity`}
               >
                 <Icon size={16} />
                 <span className="text-xs font-medium">{action.label}</span>
@@ -218,9 +209,8 @@ const AssistantScreen = () => {
           {suggestions.map((suggestion, index) => (
             <button
               key={index}
-              onClick={() => subscribed && setInputMessage(suggestion)}
-              disabled={!subscribed}
-              className="w-full text-left p-2 text-sm text-dolater-text-secondary bg-dolater-gray rounded hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setInputMessage(suggestion)}
+              className="w-full text-left p-2 text-sm text-dolater-text-secondary bg-dolater-gray rounded hover:bg-gray-200 transition-colors"
             >
               "{suggestion}"
             </button>
@@ -277,13 +267,12 @@ const AssistantScreen = () => {
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-            placeholder={subscribed ? "Ask me to create plans, organize content, or build habits from your saves..." : "Upgrade to Pro to chat with AI Assistant..."}
-            disabled={!subscribed}
-            className="flex-1 p-3 border border-gray-200 rounded-lg text-sm focus:border-dolater-mint focus:ring-1 focus:ring-dolater-mint disabled:bg-gray-100 disabled:cursor-not-allowed"
+            placeholder="Ask me to create plans, organize content, or build habits from your saves..."
+            className="flex-1 p-3 border border-gray-200 rounded-lg text-sm focus:border-dolater-mint focus:ring-1 focus:ring-dolater-mint"
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isAILoading || !subscribed}
+            disabled={!inputMessage.trim() || isAILoading}
             className="bg-dolater-mint text-white p-3 rounded-lg disabled:opacity-50 hover:bg-dolater-mint-dark transition-colors disabled:cursor-not-allowed"
           >
             <Send size={16} />
@@ -291,19 +280,15 @@ const AssistantScreen = () => {
         </div>
       </div>
 
-      {/* Pro Features Banner */}
-      <div className={`${subscribed ? 'bg-gradient-to-r from-green-500 to-green-600' : 'bg-gradient-to-r from-dolater-yellow to-yellow-400'} p-4`}>
+      {/* Testing Mode Banner */}
+      <div className="bg-gradient-to-r from-green-500 to-green-600 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-sm text-white">
-              {subscribed ? 'AI Assistant Active!' : 'Upgrade for AI Assistant'}
-            </h3>
-            <p className="text-xs text-white opacity-90">
-              {subscribed ? 'Full AI functionality enabled' : 'Get unlimited AI conversations with Pro'}
-            </p>
+            <h3 className="font-semibold text-sm text-white">AI Assistant Active (Testing Mode)</h3>
+            <p className="text-xs text-white opacity-90">Full AI functionality enabled for testing</p>
           </div>
-          <div className={`${subscribed ? 'bg-white text-green-600' : 'bg-white text-dolater-text-primary'} px-3 py-1 rounded-full text-xs font-medium`}>
-            {subscribed ? '✓ Ready' : 'Pro Only'}
+          <div className="bg-white text-green-600 px-3 py-1 rounded-full text-xs font-medium">
+            ✓ Ready
           </div>
         </div>
       </div>
