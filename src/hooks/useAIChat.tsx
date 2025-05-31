@@ -28,7 +28,7 @@ export const useAIChat = () => {
   ]);
   
   const [isLoading, setIsLoading] = useState(false);
-  const { data: contentItems = [] } = useContentItems();
+  const { contentItems = [] } = useContentItems();
   const assistantRef = useRef<InternalAIAssistant | null>(null);
 
   // Initialize internal assistant
@@ -63,7 +63,7 @@ export const useAIChat = () => {
         category: item.category,
         tags: item.tags,
         url: item.url,
-        action_type: item.action_type
+        action_type: item.actionType
       }));
 
       const result = await assistant.processMessage(userMessage, formattedContent);
