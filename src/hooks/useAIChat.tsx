@@ -1,14 +1,14 @@
 
 import { useState, useRef, useCallback } from 'react';
-import AIChatManager from '@/utils/aiChatManager';
+import { useContentItems } from '@/hooks/useContentItems';
+import InternalAIAssistant from '@/utils/internalAIAssistant';
 
 interface Message {
   id: string;
   type: 'user' | 'assistant';
   content: string;
   timestamp: string;
-  isError?: boolean;
-  isRetrying?: boolean;
+  suggestions?: string[];
 }
 
 export const useAIChat = () => {
@@ -16,21 +16,27 @@ export const useAIChat = () => {
     {
       id: '1',
       type: 'assistant',
-      content: "Hi! I'm your DoLater AI Assistant. I can help you create action plans, build habits, and turn your saved content into achievable goals. What would you like to work on today?",
-      timestamp: new Date().toISOString()
+      content: "Hi! I'm your DoLater assistant. I can help you organize your saved content, create action plans, and turn your saves into achievable goals. What would you like to work on today?",
+      timestamp: new Date().toISOString(),
+      suggestions: [
+        "Create a plan from my saves",
+        "Summarize my content", 
+        "Help me get organized",
+        "What can you help me with?"
+      ]
     }
   ]);
   
   const [isLoading, setIsLoading] = useState(false);
-  const [apiStatus, setApiStatus] = useState<'unknown' | 'healthy' | 'error'>('unknown');
-  const chatManagerRef = useRef<AIChatManager | null>(null);
+  const { data: contentItems = [] } = useContentItems();
+  const assistantRef = useRef<InternalAIAssistant | null>(null);
 
-  // Initialize chat manager
-  const getChatManager = useCallback(() => {
-    if (!chatManagerRef.current) {
-      chatManagerRef.current = new AIChatManager();
+  // Initialize internal assistant
+  const getAssistant = useCallback(() => {
+    if (!assistantRef.current) {
+      assistantRef.current = new InternalAIAssistant();
     }
-    return chatManagerRef.current;
+    return assistantRef.current;
   }, []);
 
   const sendMessage = useCallback(async (userMessage: string) => {
@@ -47,71 +53,76 @@ export const useAIChat = () => {
     setIsLoading(true);
 
     try {
-      const chatManager = getChatManager();
-      const result = await chatManager.sendMessage(userMessage);
+      const assistant = getAssistant();
+      
+      // Convert content items to the format expected by the assistant
+      const formattedContent = contentItems.map(item => ({
+        id: item.id,
+        title: item.title,
+        summary: item.summary,
+        category: item.category,
+        tags: item.tags,
+        url: item.url,
+        action_type: item.action_type
+      }));
+
+      const result = await assistant.processMessage(userMessage, formattedContent);
 
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: result.response,
         timestamp: new Date().toISOString(),
-        isError: !result.success,
-        isRetrying: result.isRetrying
+        suggestions: result.suggestions
       };
 
       setMessages(prev => [...prev, aiResponse]);
-      setApiStatus(result.success ? 'healthy' : 'error');
 
     } catch (error) {
-      console.error('Error in useAIChat:', error);
+      console.error('Error in internal AI assistant:', error);
       
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: "I'm experiencing technical difficulties. Please try again in a moment, or explore your saved content while I recover.",
+        content: "I'm having a small hiccup processing that request. Could you try rephrasing it or asking something else? I'm here to help organize your content and create action plans!",
         timestamp: new Date().toISOString(),
-        isError: true
+        suggestions: [
+          "Help me organize my saves",
+          "Create an action plan",
+          "What can you do?",
+          "Summarize my content"
+        ]
       };
 
       setMessages(prev => [...prev, errorResponse]);
-      setApiStatus('error');
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, getChatManager]);
-
-  const checkHealth = useCallback(async () => {
-    try {
-      const chatManager = getChatManager();
-      const isHealthy = await chatManager.healthCheck();
-      setApiStatus(isHealthy ? 'healthy' : 'error');
-      return isHealthy;
-    } catch {
-      setApiStatus('error');
-      return false;
-    }
-  }, [getChatManager]);
+  }, [isLoading, getAssistant, contentItems]);
 
   const clearChat = useCallback(() => {
-    const chatManager = getChatManager();
-    chatManager.clearHistory();
     setMessages([
       {
         id: '1',
         type: 'assistant',
-        content: "Hi! I'm your DoLater AI Assistant. I can help you create action plans, build habits, and turn your saved content into achievable goals. What would you like to work on today?",
-        timestamp: new Date().toISOString()
+        content: "Hi! I'm your DoLater assistant. I can help you organize your saved content, create action plans, and turn your saves into achievable goals. What would you like to work on today?",
+        timestamp: new Date().toISOString(),
+        suggestions: [
+          "Create a plan from my saves",
+          "Summarize my content",
+          "Help me get organized", 
+          "What can you help me with?"
+        ]
       }
     ]);
-    setApiStatus('unknown');
-  }, [getChatManager]);
+  }, []);
 
   return {
     messages,
     sendMessage,
     isLoading,
-    apiStatus,
-    checkHealth,
+    apiStatus: 'healthy' as const, // Always healthy since it's internal
+    checkHealth: async () => true, // Always returns true
     clearChat
   };
 };
