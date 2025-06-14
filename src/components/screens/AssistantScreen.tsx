@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Genie, Send, Zap, FileText, Calendar, CheckSquare, RotateCcw, Bot, User } from 'lucide-react';
+import { Sparkle, Send, Zap, FileText, Calendar, CheckSquare, RotateCcw, Bot, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIChat } from '@/hooks/useAIChat';
 import { cn } from '@/lib/utils';
@@ -42,7 +42,7 @@ const AssistantScreen = () => {
           <div className="flex items-center space-x-4">
             <div className="relative">
               <div className="w-12 h-12 bg-gradient-to-r from-dolater-mint to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Genie size={28} className="text-white" />
+                <Sparkle size={28} className="text-white" />
               </div>
             </div>
             <div>
