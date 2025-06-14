@@ -1,200 +1,235 @@
-import { useState } from 'react';
-import { Sparkle, Send, Zap, FileText, Calendar, CheckSquare, RotateCcw, Bot, User } from 'lucide-react';
+
+import { useRef, useEffect, useState } from 'react';
+import { Sparkle, User, Bot, Send } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIChat } from '@/hooks/useAIChat';
 import { cn } from '@/lib/utils';
 
+// Magical Genie avatar SVG
+function GenieAvatar() {
+  return (
+    <div className="relative">
+      <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-dolater-mint via-emerald-400 to-blue-400 flex items-center justify-center shadow-xl border-4 border-white animate-genie-glow">
+        <Sparkle size={34} className="text-white drop-shadow-lg animate-pulse" />
+      </div>
+      {/* Magical sparkles */}
+      <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-gradient-to-r from-emerald-300 to-emerald-500 rounded-full blur-md opacity-50 animate-float" />
+    </div>
+  );
+}
+
+// User avatar
+function UserAvatar() {
+  return (
+    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-blue-700 flex items-center justify-center shadow">
+      <User size={24} className="text-white" />
+    </div>
+  );
+}
+
+// Bubble for chat messages
+function GenieMessage({ type, content, timestamp }: { type: 'assistant' | 'user', content: string, timestamp: string }) {
+  return (
+    <div className={`flex ${type === 'user' ? 'justify-end' : 'justify-start'} items-end`}>
+      {type === 'assistant' && <GenieAvatar />}
+      <div className={cn(
+        "px-5 py-4 max-w-[80vw] rounded-3xl shadow-md text-base whitespace-pre-line leading-relaxed font-medium",
+        type === 'assistant'
+          ? "ml-3 bg-gradient-to-br from-white via-green-50 to-blue-50 text-gray-900 border border-dolater-mint/25"
+          : "mr-3 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-400 text-white border border-blue-600"
+      )}>
+        {content}
+        <span className={cn(
+          "block text-xs mt-2",
+          type === 'assistant'
+            ? 'text-gray-400'
+            : 'text-blue-100'
+        )}>
+          {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
+      {type === 'user' && <UserAvatar />}
+    </div>
+  );
+}
+
+// Magic quick action pill
+function MagicQuickAction({ label, onSelect }: { label: string, onSelect: (q: string) => void }) {
+  return (
+    <button
+      onClick={() => onSelect(label)}
+      className="flex items-center bg-gradient-to-r from-dolater-mint to-blue-400 text-white px-4 py-2 rounded-full font-semibold shadow-md hover:scale-105 transition-transform duration-200 gap-2 border-2 border-white animate-hover-quick"
+      aria-label={label}
+    >
+      <Sparkle size={18} className="text-yellow-100 drop-shadow" />
+      {label}
+    </button>
+  );
+}
+
+// Typing dots animation for Genie
+function TypingDots() {
+  return (
+    <div className="flex gap-1 items-center px-7 py-3">
+      <div className="w-2 h-2 bg-dolater-mint rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+      <div className="w-2 h-2 bg-dolater-mint rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+      <div className="w-2 h-2 bg-dolater-mint rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+      <span className="text-xs text-dolater-mint ml-2 font-semibold">Genie is thinking...</span>
+    </div>
+  );
+}
+
+const MAGIC_INTRO = [
+  "✨ Welcome to Genie! ✨",
+  "Turn your content into magic: Ask Genie to make plans, summarize, or help organize.",
+  "Just say hi! Genie will grant your (organizational) wishes."
+];
+
+const MAGIC_ACTIONS = [
+  "Create a plan from my saved content",
+  "Summarize my content",
+  "Help me get organized",
+  "Show me what you can do"
+];
+
 const AssistantScreen = () => {
-  const [inputMessage, setInputMessage] = useState('');
   const { user } = useAuth();
   const { messages, sendMessage, isLoading, clearChat } = useAIChat();
+  const [input, setInput] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !user) return;
-    const message = inputMessage;
-    setInputMessage('');
-    await sendMessage(message);
+  // Magically auto-scroll on message update
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, isLoading]);
+
+  const handleSend = async () => {
+    if (!input.trim() || !user || isLoading) return;
+    const toSend = input;
+    setInput('');
+    await sendMessage(toSend);
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    setInputMessage(suggestion);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
-  // Display only one quick action, for example, "Create Plan"
-  const quickActions = [
-    { icon: FileText, label: 'Create Plan', query: 'Create a plan from my saved content', color: 'from-blue-500 to-blue-600' },
-  ];
-
-  // Helper to get only one suggestion from the latest assistant message
-  const getLatestSuggestion = () => {
-    const lastAssistantMessage = messages
-      .slice()
-      .reverse()
-      .find(msg => msg.type === 'assistant' && msg.suggestions && msg.suggestions.length > 0);
-    return lastAssistantMessage?.suggestions?.[0] ?? null;
-  };
+  // Find latest assistant suggestions
+  const latestAssistantMessage = [...messages].reverse().find(m => m.type === 'assistant' && m.suggestions?.length);
+  const mainSuggestion = latestAssistantMessage?.suggestions?.[0];
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <div className="w-12 h-12 bg-gradient-to-r from-dolater-mint to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Sparkle size={28} className="text-white" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">Genei</h1>
-              <p className="text-sm text-gray-500">Your AI Genie</p>
-            </div>
-          </div>
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-blue-50 via-green-50 to-white transition-all">
+      {/* Genie header */}
+      <header className="sticky top-0 z-20 w-full bg-gradient-to-b from-white/90 to-transparent backdrop-blur flex items-center gap-4 py-4 px-6 shadow-md">
+        <GenieAvatar />
+        <div>
+          <h1 className="text-2xl font-genie font-extrabold text-dolater-mint tracking-tight flex items-center gap-2">
+            Genie
+            <span className="ml-2 p-1 bg-yellow-100 text-emerald-600 rounded-full text-xs font-bold animate-pulse">Magic</span>
+          </h1>
+          <p className="text-xs text-gray-500 font-medium">Your organizational genie</p>
+        </div>
+        <div className="ml-auto flex gap-2">
           <button
             onClick={clearChat}
-            className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg transition-all duration-200 text-sm"
-            title="Clear chat"
+            className="border border-dolater-mint/40 bg-dolater-mint-light text-dolater-mint px-3 py-1 text-xs rounded-lg font-semibold shadow-sm hover:bg-dolater-mint hover:text-white transition"
+            aria-label="Clear conversation"
           >
-            <RotateCcw size={16} />
-            <span>Clear</span>
+            Reset
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* Only ONE Quick Action */}
-      <div className="bg-white/60 backdrop-blur-sm border-b border-gray-200/50 p-6">
-        <div className="text-sm font-medium text-gray-600 mb-4">Quick Action</div>
-        <div className="flex gap-3">
-          {quickActions.map((action, index) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={index}
-                onClick={() => handleSuggestionClick(action.query)}
-                className={`bg-gradient-to-r ${action.color} text-white p-4 rounded-xl flex items-center space-x-3 hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl group`}
-              >
-                <Icon size={20} className="group-hover:scale-110 transition-transform duration-200" />
-                <span className="text-sm font-medium">{action.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Messages scroll area - ensure chat is always visible and takes correct height */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 bg-transparent transition-all" style={{ scrollBehavior: 'smooth' }}>
-        {messages.map((message, index) => (
-          <div 
-            key={message.id} 
-            className={cn(
-              "animate-fade-in",
-              "opacity-0 animate-[fade-in_0.5s_ease-out_forwards]"
-            )}
-            style={{ animationDelay: `${index * 0.08}s` }}
-          >
-            <div className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-3`}>
-              <div className={`flex items-start space-x-3 max-w-[85%] ${message.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                {/* Avatar */}
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-md",
-                  message.type === 'user' 
-                    ? "bg-gradient-to-r from-blue-500 to-blue-600" 
-                    : "bg-gradient-to-r from-dolater-mint to-emerald-600"
-                )}>
-                  {message.type === 'user' ? (
-                    <User size={16} className="text-white" />
-                  ) : (
-                    <Bot size={16} className="text-white" />
-                  )}
-                </div>
-
-                {/* Message Bubble */}
-                <div className={cn(
-                  "p-4 rounded-2xl shadow-sm transition-all duration-200 hover:shadow-md",
-                  message.type === 'user'
-                    ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md"
-                    : "bg-white text-gray-800 rounded-bl-md border border-gray-200"
-                )}>
-                  <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
-                  <span className={cn(
-                    "text-xs mt-2 block opacity-70",
-                    message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
-                  )}>
-                    {new Date(message.timestamp).toLocaleTimeString([], { 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
-                    })}
-                  </span>
-                </div>
-              </div>
-            </div>
-            
-            {/* Suggestions inside message bubble: If you want to show, you can keep, but remove for simpler style */}
+      {/* Magic intro, only if near-empty chat */}
+      {messages.length < 2 && (
+        <section className="px-6 pt-6 md:pt-12 pb-2 flex flex-col gap-4 text-center items-center animate-fade-in">
+          {MAGIC_INTRO.map((line, idx) => (
+            <p key={idx} className="text-lg md:text-xl font-semibold text-blue-500">{line}</p>
+          ))}
+          <div className="flex flex-wrap gap-3 justify-center mt-1">
+            {MAGIC_ACTIONS.map((action, idx) => (
+              <MagicQuickAction key={idx} label={action} onSelect={setInput} />
+            ))}
           </div>
+        </section>
+      )}
+
+      {/* Chat area */}
+      <main
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-1 py-3 md:py-6 flex flex-col gap-6 scrollbar-thin"
+        style={{ minHeight: 0, maxHeight: "calc(100vh - 180px)" }}
+      >
+        {messages.map((msg, idx) => (
+          <GenieMessage
+            key={msg.id}
+            type={msg.type}
+            content={msg.content}
+            timestamp={msg.timestamp}
+          />
         ))}
-        
-        {/* Loading Animation */}
-        {isLoading && (
-          <div className="flex justify-start animate-fade-in">
-            <div className="flex items-start space-x-3 max-w-[85%]">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-dolater-mint to-emerald-600 flex items-center justify-center shadow-md">
-                <Bot size={16} className="text-white" />
-              </div>
-              <div className="bg-white text-gray-800 p-4 rounded-2xl rounded-bl-md shadow-sm border border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-dolater-mint rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-dolater-mint rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 bg-dolater-mint rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                  </div>
-                  <span className="text-sm text-gray-500">Thinking...</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+        {/* Genie typing... */}
+        {isLoading && <TypingDots />}
+      </main>
 
-      {/* ONE Bottom Suggestion */}
-      {getLatestSuggestion() && !isLoading && (
-        <div className="bg-white/80 backdrop-blur-sm border-t border-gray-200/50 p-4 animate-slide-up">
-          <div className="text-xs font-medium text-gray-500 mb-3">Quick suggestion:</div>
+      {/* Magic quick suggestion below chat */}
+      {mainSuggestion && !isLoading && (
+        <div className="w-full py-3 px-6">
           <button
-            onClick={() => handleSuggestionClick(getLatestSuggestion())}
-            className="bg-dolater-mint/10 hover:bg-dolater-mint hover:text-white text-dolater-mint text-xs px-3 py-2 rounded-full transition-all duration-200 hover:scale-105 border border-dolater-mint/20"
+            className="w-full flex items-center justify-center bg-gradient-to-r from-dolater-mint to-blue-400 text-white px-4 py-2 rounded-2xl font-bold shadow-lg gap-2 hover:scale-105 transition-transform duration-150 border-2 border-white ring-2 ring-dolater-mint/10 animate-scale-in"
+            onClick={() => setInput(mainSuggestion)}
+            aria-label={mainSuggestion}
           >
-            {getLatestSuggestion()}
+            <Sparkle size={20} className="text-yellow-100" />
+            {mainSuggestion}
           </button>
         </div>
       )}
 
-      {/* Input Area */}
-      <div className="bg-white/90 backdrop-blur-sm border-t border-gray-200/50 p-6">
-        <div className="flex space-x-4 items-end">
-          <div className="flex-1 relative">
-            <input
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Ask Genei to help organize or create a plan from your saves..."
-              className="w-full p-4 pr-12 border border-gray-200 rounded-2xl text-sm focus:border-dolater-mint focus:ring-2 focus:ring-dolater-mint/20 transition-all duration-200 bg-white/80 backdrop-blur-sm resize-none"
-              disabled={isLoading}
-            />
-          </div>
-          <button
-            onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isLoading}
-            className={cn(
-              "p-4 rounded-2xl transition-all duration-200 shadow-lg",
-              !inputMessage.trim() || isLoading
-                ? "bg-gray-300 cursor-not-allowed"
-                : "bg-gradient-to-r from-dolater-mint to-emerald-600 hover:scale-105 hover:shadow-xl text-white"
-            )}
-          >
-            <Send size={20} />
-          </button>
-        </div>
-      </div>
+      {/* Input box area */}
+      <footer className="sticky bottom-0 z-30 w-full bg-white/80 backdrop-blur px-4 py-5 flex items-end gap-3 border-t border-dolater-mint/20 shadow-md">
+        <input
+          className="flex-1 rounded-2xl border border-dolater-mint-light focus:ring-2 focus:ring-dolater-mint/30 px-5 py-3 min-h-[48px] text-base bg-white/80 shadow focus:outline-none transition-all duration-150"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask Genie to grant your organizational wishes…"
+          disabled={isLoading}
+          aria-label="Message Genie"
+        />
+        <button
+          onClick={handleSend}
+          disabled={isLoading || !input.trim()}
+          className={cn(
+            "ml-2 rounded-2xl px-5 py-3 font-bold uppercase bg-gradient-to-br from-dolater-mint to-blue-400 text-white shadow-lg hover:scale-105 transition-all flex items-center gap-2",
+            (!input.trim() || isLoading) && "opacity-40 cursor-not-allowed"
+          )}
+          aria-label="Send message"
+        >
+          <Send size={22} className="mr-1" />
+          Send
+        </button>
+      </footer>
+
+      {/* Add magical Genie glow keyframes */}
+      <style>{`
+        @keyframes genie-glow {
+          0% { box-shadow: 0 0 0 0 #10B98155, 0 0 0 4px #FCD34D22; }
+          50% { box-shadow: 0 0 32px 8px #10B98177, 0 0 8px 8px #FCD34D11; }
+          100% { box-shadow: 0 0 0 0 #10B98155, 0 0 0 4px #FCD34D22; }
+        }
+        .animate-genie-glow { animation: genie-glow 2.5s infinite alternate; }
+        @keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0); } }
+        .animate-float { animation: float 3s infinite; }
+        @keyframes hoverQuickAction { 0% { filter: brightness(1); } 60% { filter: brightness(1.07); } 100% { filter: brightness(1.1); } }
+        .animate-hover-quick:active { animation: hoverQuickAction 0.15s; }
+      `}</style>
     </div>
   );
 };

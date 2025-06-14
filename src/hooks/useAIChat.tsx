@@ -38,6 +38,7 @@ export const useAIChat = () => {
     return assistantRef.current;
   }, []);
 
+  // --- Added extra safety for chat UX (prevents empty AI responses) ---
   const sendMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
 
@@ -65,17 +66,11 @@ export const useAIChat = () => {
         action_type: item.actionType
       }));
 
-      // DEBUG
-      console.log('[useAIChat] Sending message to Genie:', userMessage, formattedContent);
-
       const result = await assistant.processMessage(userMessage, formattedContent);
 
-      // DEBUG
-      console.log('[useAIChat] Genie returned result:', result);
-
-      let safeResponse = (result && result.response && result.response.trim()) ?
-        result.response :
-        "Sorry, Genie is having trouble responding. Please try again or check your content.";
+      let safeResponse = (result && result.response && result.response.trim())
+        ? result.response
+        : "✨ Genie couldn't think of a reply. Try rewording your wish!";
 
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
@@ -86,9 +81,6 @@ export const useAIChat = () => {
       };
 
       setMessages(prev => [...prev, aiResponse]);
-      // DEBUG
-      console.log('[useAIChat] All messages after Genie:', [...messages, aiResponse]);
-
     } catch (error) {
       console.error('Error in internal AI assistant:', error);
       
