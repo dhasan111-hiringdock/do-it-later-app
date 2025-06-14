@@ -25,53 +25,72 @@ class InternalAIAssistant {
   private suggestions = suggestions;
 
   public async processMessage(message: string, userContent: ContentItem[] = []): Promise<ChatResponse> {
+    console.log('[Genie] processMessage called with:', message, userContent);
     const lowerMessage = message.toLowerCase();
 
     // Pattern-matching with logging for debugging
     if (this.patterns.greeting.test(message)) {
       console.log("Genie matched: greeting");
+      const response = this.getRandomResponse('greeting');
+      console.log("Genie response (greeting):", response);
       return {
-        response: this.getRandomResponse('greeting'),
+        response,
         suggestions: this.getGeneralSuggestions(),
         isHelpful: true
       };
     }
     if (this.patterns.help.test(message)) {
       console.log("Genie matched: help");
+      const response = this.getHelpResponse();
+      console.log("Genie response (help):", response);
       return {
-        response: this.getHelpResponse(),
+        response,
         suggestions: this.getGeneralSuggestions(),
         isHelpful: true
       };
     }
     if (this.patterns.plan.test(message)) {
       console.log("Genie matched: plan");
-      return this.createPlanResponse(message, userContent);
+      const res = this.createPlanResponse(message, userContent);
+      console.log("Genie response (plan):", res);
+      return res;
     }
     if (this.patterns.summary.test(message)) {
       console.log("Genie matched: summary");
-      return this.createSummaryResponse(userContent);
+      const res = this.createSummaryResponse(userContent);
+      console.log("Genie response (summary):", res);
+      return res;
     }
     if (this.patterns.workout.test(message)) {
       console.log("Genie matched: workout");
-      return this.createCategoryResponse('fitness', userContent);
+      const res = this.createCategoryResponse('fitness', userContent);
+      console.log("Genie response (workout):", res);
+      return res;
     }
     if (this.patterns.finance.test(message)) {
       console.log("Genie matched: finance");
-      return this.createCategoryResponse('finance', userContent);
+      const res = this.createCategoryResponse('finance', userContent);
+      console.log("Genie response (finance):", res);
+      return res;
     }
     if (this.patterns.recipe.test(message)) {
       console.log("Genie matched: recipe");
-      return this.createRecipeResponse(userContent);
+      const res = this.createRecipeResponse(userContent);
+      console.log("Genie response (recipe):", res);
+      return res;
     }
     if (this.patterns.learn.test(message)) {
       console.log("Genie matched: learn");
-      return this.createCategoryResponse('knowledge', userContent);
+      const res = this.createCategoryResponse('knowledge', userContent);
+      console.log("Genie response (learn):", res);
+      return res;
     }
     if (this.patterns.productivity.test(message)) {
       console.log("Genie matched: productivity");
+      const response = this.getRandomResponse('productivity');
+      console.log("Genie response (productivity):", response);
       return {
-        response: this.getRandomResponse('productivity'),
+        response,
         suggestions: [
           "Build a productivity workflow",
           "Suggest focus routines",
@@ -82,40 +101,50 @@ class InternalAIAssistant {
     }
     if (this.patterns.reading.test(message)) {
       console.log("Genie matched: reading");
+      const response = this.getRandomResponse('reading');
+      console.log("Genie response (reading):", response);
       return {
-        response: this.getRandomResponse('reading'),
-        suggestions: suggestions.reading,
+        response,
+        suggestions: this.suggestions.reading,
         isHelpful: true
       };
     }
     if (this.patterns.reminder.test(message)) {
       console.log("Genie matched: reminder");
+      const response = this.getRandomResponse('reminder');
+      console.log("Genie response (reminder):", response);
       return {
-        response: this.getRandomResponse('reminder'),
+        response,
         suggestions: ["Add a reminder", "Set a due date", "Organize my tasks"],
         isHelpful: true
       };
     }
     if (this.patterns.goals.test(message)) {
       console.log("Genie matched: goals");
+      const response = this.getRandomResponse('goals');
+      console.log("Genie response (goals):", response);
       return {
-        response: this.getRandomResponse('goals'),
-        suggestions: suggestions.goals,
+        response,
+        suggestions: this.suggestions.goals,
         isHelpful: true
       };
     }
     if (this.patterns.motivation.test(message)) {
       console.log("Genie matched: motivation");
+      const response = this.getRandomResponse('motivation');
+      console.log("Genie response (motivation):", response);
       return {
-        response: this.getRandomResponse('motivation'),
-        suggestions: suggestions.motivation,
+        response,
+        suggestions: this.suggestions.motivation,
         isHelpful: true
       };
     }
     if (this.patterns.selfimprovement.test(message)) {
       console.log("Genie matched: selfimprovement");
+      const response = this.getRandomResponse('selfimprovement');
+      console.log("Genie response (selfimprovement):", response);
       return {
-        response: this.getRandomResponse('selfimprovement'),
+        response,
         suggestions: [
           "Suggest self-improvement tasks",
           "Build a better habit",
@@ -126,16 +155,20 @@ class InternalAIAssistant {
     }
     if (this.patterns.quote.test(message)) {
       console.log("Genie matched: quote");
+      const response = this.getRandomResponse('quote');
+      console.log("Genie response (quote):", response);
       return {
-        response: this.getRandomResponse('quote'),
-        suggestions: suggestions.motivation,
+        response,
+        suggestions: this.suggestions.motivation,
         isHelpful: true
       };
     }
     if (this.patterns.action.test(message)) {
       console.log("Genie matched: action");
+      const response = this.getRandomResponse('action');
+      console.log("Genie response (action):", response);
       return {
-        response: this.getRandomResponse('action'),
+        response,
         suggestions: [
           "Suggest next action",
           "Create actionable steps",
@@ -147,8 +180,11 @@ class InternalAIAssistant {
 
     // If no patterns matched, log a fallback
     console.log("Genie matched: default (no patterns matched)");
+    const defaultResponse = this.getRandomResponse('default');
+    console.log("Genie default response:", defaultResponse);
+
     return {
-      response: this.getRandomResponse('default'),
+      response: defaultResponse,
       suggestions: this.getGeneralSuggestions(),
       isHelpful: true
     };

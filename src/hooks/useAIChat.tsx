@@ -1,4 +1,3 @@
-
 import { useState, useRef, useCallback } from 'react';
 import { useContentItems } from '@/hooks/useContentItems';
 import InternalAIAssistant from '@/utils/internalAIAssistant';
@@ -66,17 +65,29 @@ export const useAIChat = () => {
         action_type: item.actionType
       }));
 
+      // DEBUG
+      console.log('[useAIChat] Sending message to Genie:', userMessage, formattedContent);
+
       const result = await assistant.processMessage(userMessage, formattedContent);
+
+      // DEBUG
+      console.log('[useAIChat] Genie returned result:', result);
+
+      let safeResponse = (result && result.response && result.response.trim()) ?
+        result.response :
+        "Sorry, Genie is having trouble responding. Please try again or check your content.";
 
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: result.response,
+        content: safeResponse,
         timestamp: new Date().toISOString(),
-        suggestions: result.suggestions
+        suggestions: result?.suggestions
       };
 
       setMessages(prev => [...prev, aiResponse]);
+      // DEBUG
+      console.log('[useAIChat] All messages after Genie:', [...messages, aiResponse]);
 
     } catch (error) {
       console.error('Error in internal AI assistant:', error);
@@ -98,7 +109,7 @@ export const useAIChat = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, getAssistant, contentItems]);
+  }, [isLoading, getAssistant, contentItems, messages]);
 
   const clearChat = useCallback(() => {
     setMessages([
