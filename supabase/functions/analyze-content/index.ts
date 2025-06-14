@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    let url, title, content;
+    let url = "", title = "", content = "";
     try {
       const json = await req.json();
       url = typeof json.url === "string" ? json.url : "";
@@ -29,11 +29,11 @@ serve(async (req) => {
       });
     }
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-    console.log('Ultra-Debug: Retrieved OpenAI API Key?:', !!openAIApiKey, 'Length:', openAIApiKey?.length);
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY') ?? "";
+    console.log('Ultra-Debug: Retrieved OpenAI API Key?:', !!openAIApiKey, 'Length:', openAIApiKey?.length, 'Type:', typeof openAIApiKey);
 
-    if (!openAIApiKey || openAIApiKey.trim().length < 10) {
-      console.error('Ultra-Debug: OPENAI_API_KEY not set or too short.');
+    if (typeof openAIApiKey !== "string" || openAIApiKey.trim().length < 20) {
+      console.error('Ultra-Debug: OPENAI_API_KEY not set or too short or not a string.', openAIApiKey);
       return new Response(JSON.stringify({ error: "OpenAI API key not configured or too short" }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -47,7 +47,7 @@ serve(async (req) => {
         const html = await urlResponse.text();
         const titleMatch = html.match(/<title>(.*?)<\/title>/i);
         const extractedTitle = titleMatch ? titleMatch[1] : '';
-        const descMatch = html.match(/<meta\s+name=["\']description["\']\s+content=["\']([^"']*)["\']/i);
+        const descMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']*)["']/i);
         const description = descMatch ? descMatch[1] : '';
         analysisContent = `${extractedTitle}\n${description}`;
       } catch (fetchError) {
@@ -72,20 +72,27 @@ serve(async (req) => {
       max_tokens: 500,
     };
 
-    console.log('Ultra-Debug: About to call OpenAI API. Body:', JSON.stringify(reqBody).slice(0,300), '...');
+    // Sanity logging for headers
+    const apiHeaders: Record<string,string> = {
+      'Authorization': `Bearer ${openAIApiKey}`,
+      'Content-Type': 'application/json'
+    };
+    for (const [k, v] of Object.entries(apiHeaders)) {
+      console.log("Ultra-Debug: OpenAI Header:", k, "=", v, "type:", typeof v, "ascii only:", /^[\x00-\x7F]*$/.test(v));
+      if (typeof v !== "string") throw new Error("Header value is not a string");
+    }
+    // Logging reqBody size
+    console.log("Ultra-Debug: OpenAI Request Body length:", JSON.stringify(reqBody).length);
 
     let openAIResponse;
     try {
       openAIResponse = await fetch(openaiEndpoint, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${String(openAIApiKey)}`,
-          'Content-Type': 'application/json',
-        },
+        headers: apiHeaders,
         body: JSON.stringify(reqBody),
       });
     } catch (apiRequestError) {
-      console.error('Ultra-Debug: Error calling OpenAI API:', apiRequestError && apiRequestError.message ? apiRequestError.message : apiRequestError);
+      console.error('Ultra-Debug: Error calling OpenAI API:', apiRequestError?.message || apiRequestError);
       return new Response(JSON.stringify({ error: "Failed to call OpenAI API", debug: String(apiRequestError) }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -134,10 +141,14 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Ultra-Debug: Error in analyze-content function:', error && error.message ? error.message : error);
-    return new Response(JSON.stringify({ error: error.message, debug: String(error) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+
+    return new Response(
+      JSON.stringify({ error: String(error?.message || error), debug: String(error) }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   }
 });
 
