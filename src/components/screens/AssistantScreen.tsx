@@ -9,16 +9,11 @@ import GenieBubble from "./GenieBubble";
 
 function GenieTypingDots() {
   return (
-    <div className="flex items-center mb-6 ml-1">
-      <div className="min-h-[46px] flex items-center">
-        <div className="flex items-center gap-1 bg-gradient-to-br from-emerald-100 to-white dark:from-emerald-900 dark:to-emerald-700 px-6 py-3 rounded-2xl shadow border border-emerald-100 dark:border-emerald-900 animate-fade-in">
-          <span className="block w-2 h-2 rounded-full bg-emerald-400 dark:bg-amber-400 animate-bounce"
-            style={{ animationDelay: "0ms" }} />
-          <span className="block w-2 h-2 rounded-full bg-emerald-300 dark:bg-amber-300 animate-bounce"
-            style={{ animationDelay: "120ms" }} />
-          <span className="block w-2 h-2 rounded-full bg-emerald-200 dark:bg-amber-200 animate-bounce"
-            style={{ animationDelay: "240ms" }} />
-        </div>
+    <div className="flex items-center mb-4">
+      <div className="flex items-center gap-1 bg-dolater-mint-light dark:bg-dolater-mint-dark px-5 py-3 rounded-2xl shadow-sm border border-dolater-mint-light dark:border-dolater-mint-dark">
+        <span className="block w-2 h-2 rounded-full bg-dolater-mint animate-bounce" style={{ animationDelay: "0ms" }} />
+        <span className="block w-2 h-2 rounded-full bg-dolater-mint/70 animate-bounce" style={{ animationDelay: "100ms" }} />
+        <span className="block w-2 h-2 rounded-full bg-dolater-mint/40 animate-bounce" style={{ animationDelay: "200ms" }} />
       </div>
     </div>
   );
@@ -27,14 +22,14 @@ function GenieTypingDots() {
 function GenieQuickSuggestions({ suggestions, onSend }: { suggestions: string[], onSend: (msg: string) => void }) {
   if (!suggestions || suggestions.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-2 my-3 px-1 items-center animate-fade-in">
+    <div className="flex flex-wrap gap-2 my-2 px-2 items-center animate-fade-in">
       {suggestions.map((s, i) => (
         <button
           key={i}
           onClick={() => onSend(s)}
-          className="bg-white/80 hover:bg-emerald-50 border border-emerald-100 dark:bg-emerald-900/80 dark:hover:bg-emerald-800 dark:border-emerald-800 text-emerald-900 dark:text-amber-100 rounded-full px-4 py-2 font-medium shadow-sm transition"
+          className="bg-white border border-dolater-mint-light dark:bg-gray-900 dark:border-dolater-mint-dark text-dolater-mint-dark dark:text-white rounded-full px-4 py-2 font-medium shadow-sm transition"
         >
-          <Sparkles className="inline -mt-1 mr-1" size={17} />
+          <Sparkles className="inline -mt-1 mr-1" size={16} />
           {s}
         </button>
       ))}
@@ -71,12 +66,11 @@ const AssistantScreen = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-br from-emerald-100 via-white to-amber-100 dark:from-gray-900 dark:via-black dark:to-emerald-950">
+    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-950">
       <GenieHeroBar />
-
       <main
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-2 py-8 flex flex-col gap-2"
+        className="flex-1 overflow-y-auto flex flex-col gap-2 px-1 pt-4 pb-1"
         style={{ minHeight: 0 }}
       >
         {messages.map((msg) => (
@@ -91,10 +85,9 @@ const AssistantScreen = () => {
         {isLoading && <GenieTypingDots />}
         <GenieQuickSuggestions suggestions={latestAssistantMsg?.suggestions ?? []} onSend={handleSend} />
       </main>
-
-      <footer className="sticky bottom-0 w-full flex items-end gap-2 bg-white/70 dark:bg-black/40 px-4 py-5 border-t border-gray-200 dark:border-gray-800 backdrop-blur-md z-10">
+      <footer className="w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 px-3 py-4 flex items-end gap-2">
         <input
-          className="flex-1 rounded-2xl border bg-white/80 dark:bg-gray-900 border-emerald-200 dark:border-emerald-900 px-5 py-3 font-medium text-base shadow focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition dark:text-white"
+          className="flex-1 rounded-2xl border bg-white dark:bg-gray-950 border-dolater-mint-light dark:border-dolater-mint-dark px-5 py-3 font-medium text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-dolater-mint focus:border-dolater-mint transition dark:text-white"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -106,16 +99,16 @@ const AssistantScreen = () => {
           onClick={() => handleSend()}
           disabled={isLoading || !input.trim()}
           className={cn(
-            "flex items-center px-5 py-[13px] rounded-2xl font-bold bg-gradient-to-br from-amber-300 via-emerald-400 to-teal-600 text-white shadow-xl transition hover:scale-[1.05] active:scale-100",
+            "flex items-center px-5 py-[13px] rounded-2xl font-bold bg-gradient-to-br from-dolater-mint to-dolater-mint-dark text-white shadow-xl transition hover:scale-[1.05] active:scale-100",
             (!input.trim() || isLoading) && "opacity-60 cursor-not-allowed"
           )}
           aria-label="Send"
         >
-          <Send size={22} />
+          <Send size={21} />
         </button>
         <button
           onClick={clearChat}
-          className="ml-2 text-gray-400 hover:text-emerald-700 dark:hover:text-emerald-300 text-xs px-2 py-2 rounded-xl transition border border-transparent hover:border-emerald-200"
+          className="ml-1 text-dolater-text-secondary hover:text-dolater-mint-dark dark:hover:text-dolater-mint text-xs px-2 py-2 rounded-xl transition border border-transparent hover:border-dolater-mint-light"
           title="Reset chat"
         >
           Reset
