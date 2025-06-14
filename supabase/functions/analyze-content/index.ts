@@ -1,5 +1,9 @@
 
-// Ultra Debug Analyze-content Edge Function
+/**
+ * Internal Content Analysis Edge Function
+ * - No OpenAI
+ * - Simple heuristics for: summary, tags, category, priority, actionType.
+ */
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -9,8 +13,61 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function getFirstSentences(text: string, count = 2): string {
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+  return sentences.slice(0, count).join(" ").trim() || (text.slice(0, 180) + (text.length > 180 ? "..." : ""));
+}
+
+// Simple tag extraction: most frequent nouns/words longer than X chars, minus stopwords
+function extractTags(text: string, max = 5): string[] {
+  if (!text) return [];
+  const stopwords = new Set([
+    "the","be","to","of","and","a","in","that","have","I","it","for","not","on","with","as","you","do","at",
+    "is","are","was","were","this","but","by","from","or","an","so","if","will","would","can","has",
+    "about","more","your","which","when","who","what","how","we","they","their","our"
+  ]);
+  const words = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !stopwords.has(w));
+  const counts: Record<string, number> = {};
+  words.forEach(w => counts[w] = (counts[w] || 0) + 1);
+  return Object.entries(counts)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([word]) => word);
+}
+
+// Heuristic category detection
+function detectCategory(text: string): string {
+  const str = text.toLowerCase();
+  if (/workout|exercise|fitness|gym|training|run|yoga|sport|walk/.test(str)) return "fitness";
+  if (/money|finance|budget|save|invest|spending|bank|investment|debt|stock/.test(str)) return "finance";
+  if (/learn|study|knowledge|course|education|class|read|tutorial|training/.test(str)) return "knowledge";
+  if (/family|goal|personal|habit|routine|journal|travel|health|diary|mood/.test(str)) return "personal";
+  if (/project|work|meeting|deadline|team|career|business|job|task|office/.test(str)) return "work";
+  return "knowledge";
+}
+
+// Heuristic priority & actionType detection
+function detectPriority(text: string): "low" | "medium" | "high" {
+  const str = text.toLowerCase();
+  if (/urgent|important|now|immediately|priority|must/.test(str)) return "high";
+  if (/soon|should|later|plan|next|review/.test(str)) return "medium";
+  return "low";
+}
+function detectActionType(text: string): "read" | "watch" | "try" | "buy" | "learn" {
+  const str = text.toLowerCase();
+  if (/watch|video|youtube|webinar|movie|film/.test(str)) return "watch";
+  if (/try|exercise|workout|practice/.test(str)) return "try";
+  if (/buy|purchase|shop/.test(str)) return "buy";
+  if (/learn|study|course|tutorial|read|summarize/.test(str)) return "learn";
+  return "read";
+}
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -22,126 +79,54 @@ serve(async (req) => {
       title = typeof json.title === "string" ? json.title : "";
       content = typeof json.content === "string" ? json.content : "";
     } catch (parseErr) {
-      console.error('Ultra-Debug: Error parsing request JSON:', parseErr);
+      console.error('Error parsing request JSON:', parseErr);
       return new Response(JSON.stringify({ error: "Invalid request JSON" }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY') ?? "";
-    console.log('Ultra-Debug: Retrieved OpenAI API Key?:', !!openAIApiKey, 'Length:', openAIApiKey?.length, 'Type:', typeof openAIApiKey);
-
-    if (typeof openAIApiKey !== "string" || openAIApiKey.trim().length < 20) {
-      console.error('Ultra-Debug: OPENAI_API_KEY not set or too short or not a string.', openAIApiKey);
-      return new Response(JSON.stringify({ error: "OpenAI API key not configured or too short" }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
+    // Try to fetch title/content from url if content is missing
     let analysisContent = content || title || '';
+    let fetchedTitle = "";
     if (url && !content) {
       try {
         const urlResponse = await fetch(url);
         const html = await urlResponse.text();
         const titleMatch = html.match(/<title>(.*?)<\/title>/i);
-        const extractedTitle = titleMatch ? titleMatch[1] : '';
+        fetchedTitle = titleMatch ? titleMatch[1] : '';
         const descMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']*)["']/i);
         const description = descMatch ? descMatch[1] : '';
-        analysisContent = `${extractedTitle}\n${description}`;
+        analysisContent = `${fetchedTitle}\n${description}`;
       } catch (fetchError) {
-        console.warn('Ultra-Debug: Could not fetch URL content:', fetchError);
+        console.warn('Could not fetch URL content:', fetchError);
       }
     }
 
-    const openaiEndpoint = 'https://api.openai.com/v1/chat/completions';
-    const reqBody = {
-      model: 'gpt-4.1-2025-04-14',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a content analyzer. Analyze the given content and return a JSON object with: summary (2-3 sentences), category (one of: fitness, finance, knowledge, personal, work), tags (array of 3-5 relevant tags), priority (low, medium, high), and actionType (read, watch, try, buy, learn). Be concise and accurate.'
-        },
-        {
-          role: 'user',
-          content: `Analyze this content:\nURL: ${url}\nTitle: ${title}\nContent: ${analysisContent}`
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 500,
+    // Use best effort analysis
+    const fullText = [title, analysisContent, url].filter(Boolean).join(' ').trim();
+
+    const summary = getFirstSentences(analysisContent || title, 2) || "No summary available.";
+    const category = detectCategory(fullText);
+    const tags = extractTags(analysisContent || title, 5);
+    const priority = detectPriority(fullText) as "low" | "medium" | "high";
+    const actionType = detectActionType(fullText);
+
+    const analysis = {
+      summary,
+      category,
+      tags,
+      priority,
+      actionType
     };
 
-    // Sanity logging for headers
-    const apiHeaders: Record<string,string> = {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json'
-    };
-    for (const [k, v] of Object.entries(apiHeaders)) {
-      console.log("Ultra-Debug: OpenAI Header:", k, "=", v, "type:", typeof v, "ascii only:", /^[\x00-\x7F]*$/.test(v));
-      if (typeof v !== "string") throw new Error("Header value is not a string");
-    }
-    // Logging reqBody size
-    console.log("Ultra-Debug: OpenAI Request Body length:", JSON.stringify(reqBody).length);
-
-    let openAIResponse;
-    try {
-      openAIResponse = await fetch(openaiEndpoint, {
-        method: 'POST',
-        headers: apiHeaders,
-        body: JSON.stringify(reqBody),
-      });
-    } catch (apiRequestError) {
-      console.error('Ultra-Debug: Error calling OpenAI API:', apiRequestError?.message || apiRequestError);
-      return new Response(JSON.stringify({ error: "Failed to call OpenAI API", debug: String(apiRequestError) }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    if (!openAIResponse.ok) {
-      const errorText = await openAIResponse.text();
-      console.error('Ultra-Debug: OpenAI API error:', openAIResponse.status, openAIResponse.statusText, errorText);
-      return new Response(JSON.stringify({ error: `OpenAI API error: ${openAIResponse.statusText}`, raw: errorText }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    let data;
-    try {
-      data = await openAIResponse.json();
-    } catch (jsonParseError) {
-      console.error('Ultra-Debug: Failed to parse OpenAI API response as JSON:', jsonParseError);
-      return new Response(JSON.stringify({ error: "Failed to parse OpenAI output JSON" }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    let analysis;
-    try {
-      analysis = JSON.parse(data.choices[0].message.content);
-    } catch (parseError) {
-      // Fallback if JSON parsing fails
-      console.warn('Ultra-Debug: Could not parse OpenAI response as JSON; using fallback.', parseError, data.choices?.[0]?.message?.content);
-      analysis = {
-        summary: data.choices?.[0]?.message?.content?.substring(0, 200) + '...',
-        category: 'knowledge',
-        tags: ['content'],
-        priority: 'medium',
-        actionType: 'read'
-      };
-    }
-
-    console.log('Ultra-Debug: Analysis result to send to client:', analysis);
+    console.log('Internal Analysis result:', analysis);
 
     return new Response(JSON.stringify(analysis), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error('Ultra-Debug: Error in analyze-content function:', error && error.message ? error.message : error);
-
+    console.error('Error in internal analyze-content function:', error?.message || error);
     return new Response(
       JSON.stringify({ error: String(error?.message || error), debug: String(error) }),
       {
@@ -151,4 +136,3 @@ serve(async (req) => {
     );
   }
 });
-
