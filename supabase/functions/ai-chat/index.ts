@@ -78,7 +78,19 @@ serve(async (req) => {
       });
     }
 
-    logStep("OpenAI API key found", { keyLength: openAIApiKey.length });
+    // Clean and validate the API key
+    const cleanApiKey = openAIApiKey.trim();
+    if (!cleanApiKey.startsWith('sk-')) {
+      logStep("ERROR: Invalid OpenAI API key format");
+      return new Response(JSON.stringify({ 
+        error: 'Invalid OpenAI API key format. Please check your API key.' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    logStep("OpenAI API key validated", { keyLength: cleanApiKey.length });
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -151,12 +163,15 @@ Always aim to turn saved content into actionable knowledge and meaningful progre
 
     logStep("Making OpenAI API request");
 
+    // Ensure headers are properly formatted
+    const requestHeaders = {
+      'Authorization': `Bearer ${cleanApiKey}`,
+      'Content-Type': 'application/json',
+    };
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: requestHeaders,
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [systemMessage, ...messages],
