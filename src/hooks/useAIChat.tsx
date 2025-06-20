@@ -1,6 +1,7 @@
+
 import { useState, useRef, useCallback } from 'react';
 import { useContentItems } from '@/hooks/useContentItems';
-import InternalAIAssistant from '@/utils/internalAIAssistant';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
@@ -15,30 +16,42 @@ export const useAIChat = () => {
     {
       id: '1',
       type: 'assistant',
-      content: "Hi! I'm your DoLater assistant. I can help you organize your saved content, create action plans, and turn your saves into achievable goals. What would you like to work on today?",
+      content: "Hi! I'm your intelligent DoLater assistant powered by AI. I can analyze and summarize your saved content, create personalized action plans, and provide insights from your articles, videos, and resources. What would you like me to help you with?",
       timestamp: new Date().toISOString(),
       suggestions: [
-        "Create a plan from my saves",
-        "Summarize my content", 
-        "Help me get organized",
-        "What can you help me with?"
+        "Summarize my latest saves",
+        "Create an action plan from my content", 
+        "Analyze my fitness articles",
+        "What should I focus on this week?"
       ]
     }
   ]);
   
   const [isLoading, setIsLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState<'healthy' | 'error' | 'checking'>('checking');
   const { contentItems = [] } = useContentItems();
-  const assistantRef = useRef<InternalAIAssistant | null>(null);
 
-  // Initialize internal assistant
-  const getAssistant = useCallback(() => {
-    if (!assistantRef.current) {
-      assistantRef.current = new InternalAIAssistant();
+  // Check API health
+  const checkHealth = useCallback(async () => {
+    try {
+      setApiStatus('checking');
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: { 
+          messages: [{ role: 'user', content: 'test' }],
+          test: true 
+        }
+      });
+      
+      if (error) throw error;
+      setApiStatus('healthy');
+      return true;
+    } catch (error) {
+      console.error('AI Chat health check failed:', error);
+      setApiStatus('error');
+      return false;
     }
-    return assistantRef.current;
   }, []);
 
-  // --- Added extra safety for chat UX (prevents empty AI responses) ---
   const sendMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
 
@@ -53,47 +66,64 @@ export const useAIChat = () => {
     setIsLoading(true);
 
     try {
-      const assistant = getAssistant();
-      
-      // Convert content items to the format expected by the assistant
-      const formattedContent = contentItems.map(item => ({
-        id: item.id,
+      // Prepare conversation context
+      const conversationMessages = messages.map(msg => ({
+        role: msg.type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+
+      // Add current message
+      conversationMessages.push({
+        role: 'user',
+        content: userMessage
+      });
+
+      // Include user's content items for context
+      const contentContext = contentItems.slice(0, 10).map(item => ({
         title: item.title,
         summary: item.summary,
         category: item.category,
-        tags: item.tags,
         url: item.url,
-        action_type: item.actionType
+        tags: item.tags
       }));
 
-      const result = await assistant.processMessage(userMessage, formattedContent);
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: { 
+          messages: conversationMessages,
+          userContent: contentContext
+        }
+      });
 
-      let safeResponse = (result && result.response && result.response.trim())
-        ? result.response
-        : "✨ Genie couldn't think of a reply. Try rewording your wish!";
+      if (error) throw error;
+
+      let responseContent = data.message?.content || "I'm having trouble processing that request. Could you try rephrasing it?";
+      
+      // Generate smart suggestions based on response
+      const suggestions = generateSmartSuggestions(userMessage, responseContent, contentItems);
 
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: safeResponse,
+        content: responseContent,
         timestamp: new Date().toISOString(),
-        suggestions: result?.suggestions
+        suggestions
       };
 
       setMessages(prev => [...prev, aiResponse]);
+      setApiStatus('healthy');
     } catch (error) {
-      console.error('Error in internal AI assistant:', error);
+      console.error('Error in AI chat:', error);
+      setApiStatus('error');
       
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: "I'm having a small hiccup processing that request. Could you try rephrasing it or asking something else? I'm here to help organize your content and create action plans!",
+        content: "I'm experiencing some technical difficulties. This might be due to API configuration issues. Please check that your OpenAI API key is properly set up, or try again in a moment.",
         timestamp: new Date().toISOString(),
         suggestions: [
-          "Help me organize my saves",
-          "Create an action plan",
-          "What can you do?",
-          "Summarize my content"
+          "Check API configuration",
+          "Try a simpler question",
+          "Refresh and try again"
         ]
       };
 
@@ -101,20 +131,20 @@ export const useAIChat = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, getAssistant, contentItems, messages]);
+  }, [isLoading, messages, contentItems]);
 
   const clearChat = useCallback(() => {
     setMessages([
       {
         id: '1',
         type: 'assistant',
-        content: "Hi! I'm your DoLater assistant. I can help you organize your saved content, create action plans, and turn your saves into achievable goals. What would you like to work on today?",
+        content: "Hi! I'm your intelligent DoLater assistant powered by AI. I can analyze and summarize your saved content, create personalized action plans, and provide insights from your articles, videos, and resources. What would you like me to help you with?",
         timestamp: new Date().toISOString(),
         suggestions: [
-          "Create a plan from my saves",
-          "Summarize my content",
-          "Help me get organized", 
-          "What can you help me with?"
+          "Summarize my latest saves",
+          "Create an action plan from my content",
+          "Analyze my fitness articles", 
+          "What should I focus on this week?"
         ]
       }
     ]);
@@ -124,8 +154,44 @@ export const useAIChat = () => {
     messages,
     sendMessage,
     isLoading,
-    apiStatus: 'healthy' as const, // Always healthy since it's internal
-    checkHealth: async () => true, // Always returns true
+    apiStatus,
+    checkHealth,
     clearChat
   };
 };
+
+// Helper function to generate contextual suggestions
+function generateSmartSuggestions(userMessage: string, response: string, contentItems: any[]): string[] {
+  const categories = [...new Set(contentItems.map(item => item.category))];
+  const lowerMessage = userMessage.toLowerCase();
+  
+  if (lowerMessage.includes('summar')) {
+    return [
+      "Create action steps from summary",
+      "Focus on specific category",
+      "Get more detailed analysis"
+    ];
+  }
+  
+  if (lowerMessage.includes('plan') || lowerMessage.includes('action')) {
+    return [
+      "Break down into weekly goals",
+      "Set reminders for tasks",
+      "Prioritize by difficulty"
+    ];
+  }
+  
+  if (categories.length > 0) {
+    return [
+      `Analyze my ${categories[0]} content`,
+      "Compare different categories",
+      "Suggest learning priorities"
+    ];
+  }
+  
+  return [
+    "Tell me more about this",
+    "Create a plan from this",
+    "What should I do first?"
+  ];
+}

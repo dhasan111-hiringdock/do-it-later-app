@@ -13,86 +13,140 @@ const logStep = (step: string, details?: any) => {
   console.log(`[AI-CHAT] ${step}${detailsStr}`);
 };
 
+// Extract and clean text content from URL
+async function extractContentFromUrl(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'DoLater-AI-Assistant/1.0' }
+    });
+    const html = await response.text();
+    
+    // Extract meaningful content (title, description, main text)
+    const titleMatch = html.match(/<title.*?>(.*?)<\/title>/is);
+    const title = titleMatch ? titleMatch[1].trim() : '';
+    
+    const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>/i);
+    const description = descMatch ? descMatch[1].trim() : '';
+    
+    // Try to extract main content
+    const mainMatch = html.match(/<(main|article)[^>]*>([\s\S]*?)<\/(main|article)>/i);
+    let mainContent = '';
+    if (mainMatch) {
+      mainContent = mainMatch[2]
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 1000); // Limit length
+    }
+    
+    return [title, description, mainContent].filter(Boolean).join(' ').slice(0, 1500);
+  } catch (error) {
+    logStep("Error extracting content from URL", { url, error: error.message });
+    return '';
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    logStep("Function started");
+    logStep("AI Chat function started");
 
-    const { messages, conversationId } = await req.json();
+    const { messages, userContent = [], test = false } = await req.json();
+    
+    // Handle test requests
+    if (test) {
+      return new Response(JSON.stringify({ 
+        message: { content: 'API is working' },
+        status: 'healthy' 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
     if (!openAIApiKey) {
       logStep("ERROR: OpenAI API key not found");
       return new Response(JSON.stringify({ 
-        error: 'OpenAI API key not configured. Please check your edge function secrets.' 
+        error: 'OpenAI API key not configured. Please add your OpenAI API key in the Supabase dashboard under Edge Functions > Secrets.' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // More flexible API key validation - just check if it exists and has some content
-    if (!openAIApiKey.trim() || openAIApiKey.length < 10) {
-      logStep("ERROR: Invalid API key - too short or empty");
-      return new Response(JSON.stringify({ 
-        error: 'Invalid OpenAI API key. Please check your API key configuration.' 
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    logStep("OpenAI API key found and validated", { keyLength: openAIApiKey.length });
+    logStep("OpenAI API key found", { keyLength: openAIApiKey.length });
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get auth header and create authenticated client for user operations
+    // Get auth header for user context
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       logStep("ERROR: No authorization header");
-      return new Response(JSON.stringify({ error: 'No authorization header provided' }), {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const supabaseAuth = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    logStep("Supabase clients initialized");
-
-    // Get user's content items for context
-    const { data: contentItems, error: contentError } = await supabaseAuth
-      .from('content_items')
-      .select('*')
-      .limit(10);
-
-    if (contentError) {
-      logStep("Error fetching content items", { error: contentError });
+    // Enhance user content with actual content from URLs when relevant
+    let enhancedContent = userContent;
+    const lastUserMessage = messages[messages.length - 1]?.content?.toLowerCase() || '';
+    
+    if (lastUserMessage.includes('summar') || lastUserMessage.includes('analyz') || lastUserMessage.includes('content')) {
+      logStep("Enhancing content for analysis");
+      enhancedContent = await Promise.all(
+        userContent.slice(0, 5).map(async (item: any) => {
+          if (item.url && !item.summary) {
+            const extractedContent = await extractContentFromUrl(item.url);
+            return { ...item, extractedContent };
+          }
+          return item;
+        })
+      );
     }
 
-    const contextPrompt = contentItems && contentItems.length > 0 
-      ? `Here are some of the user's saved content items for context: ${JSON.stringify(contentItems.map(item => ({ title: item.title, summary: item.summary, category: item.category })))}`
+    // Prepare context for OpenAI
+    const contextPrompt = enhancedContent.length > 0 
+      ? `User's saved content (${enhancedContent.length} items):
+${enhancedContent.map((item: any) => `
+- Title: ${item.title}
+- Category: ${item.category}
+- Summary: ${item.summary || 'No summary'}
+- URL: ${item.url}
+- Tags: ${item.tags?.join(', ') || 'None'}
+${item.extractedContent ? `- Content: ${item.extractedContent}` : ''}
+`).join('\n')}`
       : "The user hasn't saved any content items yet.";
 
     const systemMessage = {
       role: 'system',
-      content: `You are a DoLater AI Assistant that helps users organize and take action on their saved content. You can:
-1. Create action plans from saved content
-2. Build habits based on user's interests
-3. Organize content into actionable steps
-4. Provide productivity coaching
+      content: `You are an intelligent DoLater AI Assistant that helps users organize and take action on their saved content. You excel at:
+
+1. **Content Analysis**: Deeply analyze articles, videos, and resources to extract key insights
+2. **Smart Summarization**: Create concise, actionable summaries that highlight the most important points
+3. **Action Planning**: Transform content into step-by-step action plans and achievable goals
+4. **Personalized Recommendations**: Suggest next steps based on the user's interests and saved content
+5. **Content Organization**: Help categorize and prioritize saved items
 
 ${contextPrompt}
 
-Be helpful, actionable, and concise. Focus on turning saved content into achievable goals.`
+Guidelines:
+- Be specific and actionable in your responses
+- When summarizing, focus on key takeaways and actionable insights
+- Create realistic, time-bound action plans
+- Reference specific content items when relevant
+- Ask clarifying questions when needed
+- Keep responses concise but comprehensive
+- Suggest follow-up actions and related content exploration
+
+Always aim to turn saved content into actionable knowledge and meaningful progress.`
     };
 
     logStep("Making OpenAI API request");
@@ -146,30 +200,6 @@ Be helpful, actionable, and concise. Focus on turning saved content into achieva
     const assistantMessage = data.choices[0].message;
 
     logStep("OpenAI response received", { messageLength: assistantMessage.content?.length || 0 });
-
-    // Save conversation if conversationId provided
-    if (conversationId) {
-      const { error: insertError } = await supabase
-        .from('ai_messages')
-        .insert([
-          {
-            conversation_id: conversationId,
-            role: 'user',
-            content: messages[messages.length - 1].content
-          },
-          {
-            conversation_id: conversationId,
-            role: 'assistant',
-            content: assistantMessage.content
-          }
-        ]);
-
-      if (insertError) {
-        logStep("Error saving conversation", { error: insertError });
-      } else {
-        logStep("Conversation saved successfully");
-      }
-    }
 
     return new Response(JSON.stringify({ message: assistantMessage }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
